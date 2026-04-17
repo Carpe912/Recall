@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "preserve"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/graphite" }
+  ]
+}

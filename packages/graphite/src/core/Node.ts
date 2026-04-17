@@ -1,0 +1,323 @@
+import { GraphicObject } from './GraphicObject'
+import type { NodeData, NodeStyle, Rect, Point } from '../types'
+import { pointInRect } from '../utils/geometry'
+
+export class Node extends GraphicObject {
+  width: number
+  height: number
+  content: string
+  style: Required<NodeStyle>
+
+  constructor(data: NodeData) {
+    super('node', data.id)
+    this.width = data.width
+    this.height = data.height
+    this.content = data.content
+    this.transform.x = data.x
+    this.transform.y = data.y
+
+    // 默认样式
+    this.style = {
+      fill: data.style?.fill || '#ffffff',
+      stroke: data.style?.stroke || '#333333',
+      strokeWidth: data.style?.strokeWidth || 2,
+      borderRadius: data.style?.borderRadius || 8,
+      fontSize: data.style?.fontSize || 14,
+      fontColor: data.style?.fontColor || '#333333',
+    }
+  }
+
+  draw(ctx: CanvasRenderingContext2D, showPorts: boolean = false): void {
+    if (!this.visible) return
+
+    ctx.save()
+
+    // 应用变换
+    ctx.translate(this.transform.x, this.transform.y)
+    ctx.rotate(this.transform.rotation)
+    ctx.scale(this.transform.scaleX, this.transform.scaleY)
+
+    // 绘制矩形（带圆角）
+    const x = -this.width / 2
+    const y = -this.height / 2
+    const radius = this.style.borderRadius
+
+    ctx.beginPath()
+    ctx.moveTo(x + radius, y)
+    ctx.lineTo(x + this.width - radius, y)
+    ctx.quadraticCurveTo(x + this.width, y, x + this.width, y + radius)
+    ctx.lineTo(x + this.width, y + this.height - radius)
+    ctx.quadraticCurveTo(x + this.width, y + this.height, x + this.width - radius, y + this.height)
+    ctx.lineTo(x + radius, y + this.height)
+    ctx.quadraticCurveTo(x, y + this.height, x, y + this.height - radius)
+    ctx.lineTo(x, y + radius)
+    ctx.quadraticCurveTo(x, y, x + radius, y)
+    ctx.closePath()
+
+    // 填充
+    ctx.fillStyle = this.style.fill
+    ctx.fill()
+
+    // 描边
+    ctx.strokeStyle = this.style.stroke
+    ctx.lineWidth = this.style.strokeWidth
+    ctx.stroke()
+
+    // 绘制文本
+    ctx.fillStyle = this.style.fontColor
+    ctx.font = `${this.style.fontSize}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(this.content, 0, 0)
+
+    // 绘制连接点
+    if (showPorts) {
+      this.drawPorts(ctx)
+    }
+
+    ctx.restore()
+  }
+
+  // 绘制连接点
+  private drawPorts(ctx: CanvasRenderingContext2D): void {
+    const portRadius = 6
+    const ports = [
+      { x: 0, y: -this.height / 2 },           // top
+      { x: this.width / 2, y: 0 },             // right
+      { x: 0, y: this.height / 2 },            // bottom
+      { x: -this.width / 2, y: 0 },            // left
+    ]
+
+    ports.forEach(port => {
+      ctx.beginPath()
+      ctx.arc(port.x, port.y, portRadius, 0, Math.PI * 2)
+      ctx.fillStyle = '#4A90E2'
+      ctx.fill()
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 2
+      ctx.stroke()
+    })
+  }
+
+  // 绘制调整大小的控制点
+  drawResizeHandles(ctx: CanvasRenderingContext2D): void {
+    const handleSize = 8
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    const handles = [
+      { x: -halfWidth, y: -halfHeight },      // top-left
+      { x: halfWidth, y: -halfHeight },       // top-right
+      { x: halfWidth, y: halfHeight },        // bottom-right
+      { x: -halfWidth, y: halfHeight },       // bottom-left
+      { x: 0, y: -halfHeight },               // top
+      { x: halfWidth, y: 0 },                 // right
+      { x: 0, y: halfHeight },                // bottom
+      { x: -halfWidth, y: 0 },                // left
+    ]
+
+    ctx.save()
+    ctx.translate(this.transform.x, this.transform.y)
+
+    handles.forEach(handle => {
+      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = '#4A90E2'
+      ctx.lineWidth = 2
+      ctx.fillRect(
+        handle.x - handleSize / 2,
+        handle.y - handleSize / 2,
+        handleSize,
+        handleSize
+      )
+      ctx.strokeRect(
+        handle.x - handleSize / 2,
+        handle.y - handleSize / 2,
+        handleSize,
+        handleSize
+      )
+    })
+
+    ctx.restore()
+  }
+
+  // 绘制旋转控制点
+  drawRotateHandle(ctx: CanvasRenderingContext2D): void {
+    const handleRadius = 8
+    const handleDistance = 20
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    ctx.save()
+    ctx.translate(this.transform.x, this.transform.y)
+
+    // 旋转控制点位置：右上角
+    const handleX = halfWidth + handleDistance
+    const handleY = -halfHeight - handleDistance
+
+    // 绘制连接线
+    ctx.beginPath()
+    ctx.moveTo(halfWidth, -halfHeight)
+    ctx.lineTo(handleX, handleY)
+    ctx.strokeStyle = '#4A90E2'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // 绘制旋转控制点（圆形背景）
+    ctx.beginPath()
+    ctx.arc(handleX, handleY, handleRadius, 0, Math.PI * 2)
+    ctx.fillStyle = '#4A90E2'
+    ctx.fill()
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // 绘制旋转图标（圆形箭头）
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.arc(handleX, handleY, handleRadius * 0.5, -Math.PI * 0.7, Math.PI * 0.7, false)
+    ctx.stroke()
+
+    // 绘制箭头
+    const arrowSize = 3
+    const arrowAngle = Math.PI * 0.7
+    const arrowX = handleX + Math.cos(arrowAngle) * handleRadius * 0.5
+    const arrowY = handleY + Math.sin(arrowAngle) * handleRadius * 0.5
+
+    ctx.beginPath()
+    ctx.moveTo(arrowX, arrowY)
+    ctx.lineTo(arrowX - arrowSize, arrowY - arrowSize * 0.5)
+    ctx.lineTo(arrowX - arrowSize * 0.5, arrowY + arrowSize * 0.5)
+    ctx.closePath()
+    ctx.fillStyle = '#ffffff'
+    ctx.fill()
+
+    ctx.restore()
+  }
+
+  hitTest(x: number, y: number): boolean {
+    const local = this.worldToLocal({ x, y })
+    return (
+      Math.abs(local.x) <= this.width / 2 &&
+      Math.abs(local.y) <= this.height / 2
+    )
+  }
+
+  getBounds(): Rect {
+    return {
+      x: this.transform.x - this.width / 2,
+      y: this.transform.y - this.height / 2,
+      width: this.width,
+      height: this.height,
+    }
+  }
+
+  clone(): Node {
+    return new Node({
+      x: this.transform.x,
+      y: this.transform.y,
+      width: this.width,
+      height: this.height,
+      content: this.content,
+      style: { ...this.style },
+    })
+  }
+
+  // 获取中心点
+  getCenter(): Point {
+    return {
+      x: this.transform.x,
+      y: this.transform.y,
+    }
+  }
+
+  // 获取连接点位置
+  getPortPosition(position: 'top' | 'right' | 'bottom' | 'left'): Point {
+    const center = this.getCenter()
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    switch (position) {
+      case 'top':
+        return { x: center.x, y: center.y - halfHeight }
+      case 'right':
+        return { x: center.x + halfWidth, y: center.y }
+      case 'bottom':
+        return { x: center.x, y: center.y + halfHeight }
+      case 'left':
+        return { x: center.x - halfWidth, y: center.y }
+    }
+  }
+
+  // 检测点击的是哪个连接点
+  hitTestPort(x: number, y: number): 'top' | 'right' | 'bottom' | 'left' | null {
+    const portRadius = 8 // 稍微大一点，方便点击
+    const ports: Array<{ position: 'top' | 'right' | 'bottom' | 'left', point: Point }> = [
+      { position: 'top', point: this.getPortPosition('top') },
+      { position: 'right', point: this.getPortPosition('right') },
+      { position: 'bottom', point: this.getPortPosition('bottom') },
+      { position: 'left', point: this.getPortPosition('left') },
+    ]
+
+    for (const port of ports) {
+      const dx = x - port.point.x
+      const dy = y - port.point.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      if (distance <= portRadius) {
+        return port.position
+      }
+    }
+
+    return null
+  }
+
+  // 检测调整大小的控制点
+  hitTestResizeHandle(x: number, y: number): string | null {
+    const handleSize = 12
+    const center = this.getCenter()
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    const handles: Array<{ name: string, point: Point }> = [
+      { name: 'nw', point: { x: center.x - halfWidth, y: center.y - halfHeight } },
+      { name: 'ne', point: { x: center.x + halfWidth, y: center.y - halfHeight } },
+      { name: 'se', point: { x: center.x + halfWidth, y: center.y + halfHeight } },
+      { name: 'sw', point: { x: center.x - halfWidth, y: center.y + halfHeight } },
+      { name: 'n', point: { x: center.x, y: center.y - halfHeight } },
+      { name: 'e', point: { x: center.x + halfWidth, y: center.y } },
+      { name: 's', point: { x: center.x, y: center.y + halfHeight } },
+      { name: 'w', point: { x: center.x - halfWidth, y: center.y } },
+    ]
+
+    for (const handle of handles) {
+      if (
+        Math.abs(x - handle.point.x) <= handleSize / 2 &&
+        Math.abs(y - handle.point.y) <= handleSize / 2
+      ) {
+        return handle.name
+      }
+    }
+
+    return null
+  }
+
+  // 检测旋转控制点
+  hitTestRotateHandle(x: number, y: number): boolean {
+    const handleRadius = 12
+    const handleDistance = 20
+    const center = this.getCenter()
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    const handlePoint = {
+      x: center.x + halfWidth + handleDistance,
+      y: center.y - halfHeight - handleDistance,
+    }
+
+    const dx = x - handlePoint.x
+    const dy = y - handlePoint.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+
+    return distance <= handleRadius
+  }
+}
