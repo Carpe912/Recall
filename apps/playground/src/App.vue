@@ -8,6 +8,13 @@
         <button @click="undo">Undo</button>
         <button @click="redo">Redo</button>
         <button @click="autoLayout">Auto Layout</button>
+        <select v-model="layoutType" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+          <option value="hierarchical">层次布局</option>
+          <option value="tree">树形布局</option>
+          <option value="force">力导向布局</option>
+          <option value="circular">环形布局</option>
+          <option value="grid">网格布局</option>
+        </select>
         <button @click="clear">Clear</button>
         <button @click="exportJSON">Export JSON</button>
         <button @click="importJSON">Import JSON</button>
@@ -59,6 +66,7 @@ import { GraphiteEditor } from '@recall/graphite'
 const canvasRef = ref<HTMLCanvasElement>()
 let editor: GraphiteEditor | null = null
 const selectedNodes = ref<string[]>([])
+const layoutType = ref<'hierarchical' | 'tree' | 'force' | 'circular' | 'grid'>('hierarchical')
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -173,7 +181,7 @@ function redo() {
 }
 
 function autoLayout() {
-  editor?.autoLayout()
+  editor?.autoLayout({ type: layoutType.value })
 }
 
 function clear() {

@@ -15,7 +15,9 @@ import {
   DeleteEdgeCommand,
 } from './interaction/Commands'
 import { EventEmitter } from './utils/EventEmitter'
+import { LayoutEngine } from './utils/LayoutEngine'
 import type { NodeData, EdgeData, Point, NodeStyle, EdgeStyle } from './types'
+import type { LayoutOptions } from './utils/LayoutEngine'
 
 export class GraphiteEditor extends EventEmitter {
   private canvas: HTMLCanvasElement
@@ -843,18 +845,9 @@ export class GraphiteEditor extends EventEmitter {
     }
   }
 
-  // 自动布局（简单版本）
-  autoLayout(): void {
-    // 简单的网格布局
-    const cols = Math.ceil(Math.sqrt(this.nodes.length))
-    const spacing = 200
-
-    this.nodes.forEach((node, i) => {
-      const col = i % cols
-      const row = Math.floor(i / cols)
-      node.setPosition(col * spacing + 100, row * spacing + 100)
-    })
-
+  // 自动布局
+  autoLayout(options: LayoutOptions = { type: 'hierarchical' }): void {
+    LayoutEngine.layout(this.nodes, this.edges, options)
     this.updateEdges()
     this.renderer.markDirty()
   }
