@@ -111,6 +111,74 @@
 
         <div class="toolbar-sep"></div>
 
+        <!-- 对齐工具 -->
+        <button class="icon-btn" @click="alignLeft" :disabled="selectedNodes.length < 2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="3" y2="18"/>
+            <rect x="7" y="6" width="6" height="4" rx="1"/>
+            <rect x="7" y="14" width="10" height="4" rx="1"/>
+          </svg>
+          <div class="btn-tip">左对齐</div>
+        </button>
+        <button class="icon-btn" @click="alignCenterHorizontal" :disabled="selectedNodes.length < 2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="3" x2="12" y2="21"/>
+            <rect x="7" y="6" width="10" height="4" rx="1"/>
+            <rect x="5" y="14" width="14" height="4" rx="1"/>
+          </svg>
+          <div class="btn-tip">水平居中</div>
+        </button>
+        <button class="icon-btn" @click="alignRight" :disabled="selectedNodes.length < 2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="21" y1="6" x2="21" y2="18"/>
+            <rect x="11" y="6" width="6" height="4" rx="1"/>
+            <rect x="7" y="14" width="10" height="4" rx="1"/>
+          </svg>
+          <div class="btn-tip">右对齐</div>
+        </button>
+        <button class="icon-btn" @click="alignTop" :disabled="selectedNodes.length < 2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="18" y2="3"/>
+            <rect x="6" y="7" width="4" height="6" rx="1"/>
+            <rect x="14" y="7" width="4" height="10" rx="1"/>
+          </svg>
+          <div class="btn-tip">顶部对齐</div>
+        </button>
+        <button class="icon-btn" @click="alignCenterVertical" :disabled="selectedNodes.length < 2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <rect x="6" y="7" width="4" height="10" rx="1"/>
+            <rect x="14" y="5" width="4" height="14" rx="1"/>
+          </svg>
+          <div class="btn-tip">垂直居中</div>
+        </button>
+        <button class="icon-btn" @click="alignBottom" :disabled="selectedNodes.length < 2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="21" x2="18" y2="21"/>
+            <rect x="6" y="11" width="4" height="6" rx="1"/>
+            <rect x="14" y="7" width="4" height="10" rx="1"/>
+          </svg>
+          <div class="btn-tip">底部对齐</div>
+        </button>
+        <button class="icon-btn" @click="distributeHorizontally" :disabled="selectedNodes.length < 3">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="8" width="4" height="8" rx="1"/>
+            <rect x="10" y="8" width="4" height="8" rx="1"/>
+            <rect x="17" y="8" width="4" height="8" rx="1"/>
+          </svg>
+          <div class="btn-tip">水平分布</div>
+        </button>
+        <button class="icon-btn" @click="distributeVertically" :disabled="selectedNodes.length < 3">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="3" width="8" height="4" rx="1"/>
+            <rect x="8" y="10" width="8" height="4" rx="1"/>
+            <rect x="8" y="17" width="8" height="4" rx="1"/>
+          </svg>
+          <div class="btn-tip">垂直分布</div>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
         <!-- 分组 / 取消分组 -->
         <button class="icon-btn" @click="groupSelected" :disabled="selectedNodes.length < 2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -270,6 +338,16 @@ function undo() { editor?.undo() }
 function redo() { editor?.redo() }
 function autoLayout() { editor?.autoLayout({ type: layoutType.value }) }
 function clear() { editor?.clear() }
+
+// 对齐工具
+function alignLeft() { editor?.alignLeft() }
+function alignCenterHorizontal() { editor?.alignCenterHorizontal() }
+function alignRight() { editor?.alignRight() }
+function alignTop() { editor?.alignTop() }
+function alignCenterVertical() { editor?.alignCenterVertical() }
+function alignBottom() { editor?.alignBottom() }
+function distributeHorizontally() { editor?.distributeHorizontally() }
+function distributeVertically() { editor?.distributeVertically() }
 
 function updateSelectedNodesStyle() {
   if (!editor || selectedNodes.value.length === 0) return

@@ -1200,6 +1200,117 @@ export class GraphiteEditor extends EventEmitter {
     return this.groups
   }
 
+  // 对齐工具
+  alignLeft(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return
+
+    const minX = Math.min(...selectedNodes.map(n => n.transform.x - n.width / 2))
+    selectedNodes.forEach(node => {
+      node.setPosition(minX + node.width / 2, node.transform.y)
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  alignCenterHorizontal(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return
+
+    const avgX = selectedNodes.reduce((sum, n) => sum + n.transform.x, 0) / selectedNodes.length
+    selectedNodes.forEach(node => {
+      node.setPosition(avgX, node.transform.y)
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  alignRight(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return
+
+    const maxX = Math.max(...selectedNodes.map(n => n.transform.x + n.width / 2))
+    selectedNodes.forEach(node => {
+      node.setPosition(maxX - node.width / 2, node.transform.y)
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  alignTop(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return
+
+    const minY = Math.min(...selectedNodes.map(n => n.transform.y - n.height / 2))
+    selectedNodes.forEach(node => {
+      node.setPosition(node.transform.x, minY + node.height / 2)
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  alignCenterVertical(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return
+
+    const avgY = selectedNodes.reduce((sum, n) => sum + n.transform.y, 0) / selectedNodes.length
+    selectedNodes.forEach(node => {
+      node.setPosition(node.transform.x, avgY)
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  alignBottom(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return
+
+    const maxY = Math.max(...selectedNodes.map(n => n.transform.y + n.height / 2))
+    selectedNodes.forEach(node => {
+      node.setPosition(node.transform.x, maxY - node.height / 2)
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  distributeHorizontally(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 3) return
+
+    const sorted = [...selectedNodes].sort((a, b) => a.transform.x - b.transform.x)
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    const totalSpace = last.transform.x - first.transform.x
+    const spacing = totalSpace / (sorted.length - 1)
+
+    sorted.forEach((node, index) => {
+      if (index > 0 && index < sorted.length - 1) {
+        node.setPosition(first.transform.x + spacing * index, node.transform.y)
+      }
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  distributeVertically(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 3) return
+
+    const sorted = [...selectedNodes].sort((a, b) => a.transform.y - b.transform.y)
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    const totalSpace = last.transform.y - first.transform.y
+    const spacing = totalSpace / (sorted.length - 1)
+
+    sorted.forEach((node, index) => {
+      if (index > 0 && index < sorted.length - 1) {
+        node.setPosition(node.transform.x, first.transform.y + spacing * index)
+      }
+    })
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
   // 销毁
   destroy(): void {
     this.canvas.removeEventListener('mousemove', this.boundOnMouseMove)
