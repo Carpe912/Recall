@@ -1032,4 +1032,172 @@ export class GraphiteEditor extends EventEmitter {
     this.minimap.destroy()
     this.clear()
   }
+
+  // 导出为 JSON
+  exportToJSON(): string {
+    const data = {
+      nodes: this.nodes.map(node => ({
+        id: node.id,
+        x: node.transform.x,
+        y: node.transform.y,
+        width: node.width,
+        height: node.height,
+        content: node.content,
+        style: node.style,
+      })),
+      edges: this.edges.map(edge => ({
+        id: edge.id,
+        from: edge.fromNodeId,
+        to: edge.toNodeId,
+        style: edge.style,
+      })),
+    }
+    return JSON.stringify(data, null, 2)
+  }
+
+  // 从 JSON 导入
+  importFromJSON(json: string): void {
+    try {
+      const data = JSON.parse(json)
+
+      // 清空当前画布
+      this.clear()
+
+      // 导入节点
+      const nodeMap = new Map<string, Node>()
+      data.nodes?.forEach((nodeData: any) => {
+        const node = this.createNode(nodeData)
+        nodeMap.set(nodeData.id, node)
+      })
+
+      // 导入边
+      data.edges?.forEach((edgeData: any) => {
+        this.createEdge(edgeData)
+      })
+
+      this.renderer.markDirty()
+    } catch (error) {
+      console.error('Failed to import JSON:', error)
+      throw new Error('Invalid JSON format')
+    }
+  }
+
+  // 导出为 PNG
+  exportToPNG(): string {
+    // 创建临时 canvas
+    const tempCanvas = document.createElement('canvas')
+    const bounds = this.getContentBounds()
+
+    const padding = 50
+    tempCanvas.width = bounds.width + padding * 2
+    tempCanvas.height = bounds.height + padding * 2
+
+    const ctx = tempCanvas.getContext('2d')
+    if (!ctx) throw new Error('Failed to get 2D context')
+
+    // 白色背景
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height)
+
+    // 平移到内容区域
+    ctx.translate(padding - bounds.x, padding - bounds.y)
+
+    // 绘制边
+    this.edges.forEach(edge => {
+      if (edge.visible) {
+        edge.draw(ctx)
+      }
+    })
+
+    // 绘制节点
+    this.nodes.forEach(node => {
+      if (node.visible) {
+        node.draw(ctx, false)
+      }
+    })
+
+    return tempCanvas.toDataURL('image/png')
+  }
+
+  // 导出为 SVG
+  exportToSVG(): string {
+    const bounds = this.getContentBounds()
+    const padding = 50
+    const width = bounds.width + padding * 2
+    const height = bounds.height + padding * 2
+
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n`
+    svg += `  <rect width="${width}" height="${height}" fill="white"/>\n`
+    svg += `  <g transform="translate(${padding - bounds.x}, ${padding - bounds.y})">\n`
+
+    // 绘制边
+    this.edges.forEach(edge => {
+      if (!edge.visible || edge.points.length < 2) return
+
+      const points = edge.points.map(p => `${p.x},${p.y}`).join(' ')
+      svg += `    <polyline points="${points}" fill="none" stroke="${edge.style.stroke}" stroke-width="${edge.style.strokeWidth}" opacity="${edge.style.opacity}"`
+
+      if (edge.style.strokeDasharray) {
+        svg += ` stroke-dasharray="${edge.style.strokeDasharray}"`
+      }
+
+      svg += `/>\n`
+
+      // 绘制箭头（简化版）
+      if (edge.style.arrowType === 'arrow' && edge.points.length >= 2) {
+        const last = edge.points[edge.points.length - 1]
+        const secondLast = edge.points[edge.points.length - 2]
+        const angle = Math.atan2(last.y - secondLast.y, last.x - secondLast.x)
+        const arrowSize = edge.style.arrowSize
+
+        const p1x = last.x - arrowSize * Math.cos(angle - Math.PI / 6)
+        const p1y = last.y - arrowSize * Math.sin(angle - Math.PI / 6)
+        const p2x = last.x - arrowSize * Math.cos(angle + Math.PI / 6)
+        const p2y = last.y - arrowSize * Math.sin(angle + Math.PI / 6)
+
+        svg += `    <polygon points="${last.x},${last.y} ${p1x},${p1y} ${p2x},${p2y}" fill="${edge.style.stroke}" opacity="${edge.style.opacity}"/>\n`
+      }
+    })
+
+    // 绘制节点
+    this.nodes.forEach(node => {
+      if (!node.visible) return
+
+      const bounds = node.getBounds()
+      svg += `    <rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" fill="${node.style.fill}" stroke="${node.style.stroke}" stroke-width="${node.style.strokeWidth}" rx="${node.style.borderRadius}" opacity="${node.style.opacity}"/>\n`
+      svg += `    <text x="${node.transform.x}" y="${node.transform.y}" text-anchor="middle" dominant-baseline="middle" font-size="${node.style.fontSize}" fill="${node.style.fontColor}">${node.content}</text>\n`
+    })
+
+    svg += `  </g>\n`
+    svg += `</svg>`
+
+    return svg
+  }
+
+  // 获取内容边界
+  private getContentBounds(): { x: number; y: number; width: number; height: number } {
+    if (this.nodes.length === 0) {
+      return { x: 0, y: 0, width: 800, height: 600 }
+    }
+
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+
+    this.nodes.forEach(node => {
+      const bounds = node.getBounds()
+      minX = Math.min(minX, bounds.x)
+      minY = Math.min(minY, bounds.y)
+      maxX = Math.max(maxX, bounds.x + bounds.width)
+      maxY = Math.max(maxY, bounds.y + bounds.height)
+    })
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    }
+  }
 }

@@ -9,6 +9,10 @@
         <button @click="redo">Redo</button>
         <button @click="autoLayout">Auto Layout</button>
         <button @click="clear">Clear</button>
+        <button @click="exportJSON">Export JSON</button>
+        <button @click="importJSON">Import JSON</button>
+        <button @click="exportPNG">Export PNG</button>
+        <button @click="exportSVG">Export SVG</button>
       </div>
     </div>
     <div class="main-content">
@@ -180,6 +184,66 @@ function updateSelectedNodesStyle() {
   if (!editor || selectedNodes.value.length === 0) return
 
   editor.updateNodesStyle(selectedNodes.value, nodeStyle.value)
+}
+
+function exportJSON() {
+  if (!editor) return
+
+  const json = editor.exportToJSON()
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `graphite-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importJSON() {
+  if (!editor) return
+
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const json = e.target?.result as string
+        editor!.importFromJSON(json)
+      } catch (error) {
+        alert('导入失败：' + error)
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
+function exportPNG() {
+  if (!editor) return
+
+  const dataUrl = editor.exportToPNG()
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = `graphite-${Date.now()}.png`
+  a.click()
+}
+
+function exportSVG() {
+  if (!editor) return
+
+  const svg = editor.exportToSVG()
+  const blob = new Blob([svg], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `graphite-${Date.now()}.svg`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 </script>
 
