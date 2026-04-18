@@ -40,49 +40,53 @@
       <div class="floating-toolbar">
 
         <!-- 节点 / 连线 -->
-        <button class="icon-btn" @click="addNode" title="添加节点">
+        <button class="icon-btn" @click="addNode">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="5" width="18" height="14" rx="2"/>
             <line x1="12" y1="9" x2="12" y2="15"/>
             <line x1="9" y1="12" x2="15" y2="12"/>
           </svg>
+          <div class="btn-tip">添加节点</div>
         </button>
-        <button class="icon-btn" @click="addEdge" :disabled="selectedNodes.length !== 2" title="添加连线（先选中 2 个节点）">
+        <button class="icon-btn" @click="addEdge" :disabled="selectedNodes.length !== 2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="5" cy="12" r="2.5"/>
             <circle cx="19" cy="12" r="2.5"/>
             <line x1="7.5" y1="12" x2="14" y2="12"/>
             <polyline points="13 9 16.5 12 13 15"/>
           </svg>
+          <div class="btn-tip">添加连线（先选中 2 个节点）</div>
         </button>
 
         <div class="toolbar-sep"></div>
 
         <!-- 撤销 / 重做 -->
-        <button class="icon-btn" @click="undo" title="撤销 (Ctrl+Z)">
+        <button class="icon-btn" @click="undo">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 9h13a5 5 0 0 1 0 10H7"/>
             <polyline points="3 5 3 9 7 9"/>
           </svg>
+          <div class="btn-tip">撤销 <kbd>Ctrl Z</kbd></div>
         </button>
-        <button class="icon-btn" @click="redo" title="重做 (Ctrl+Shift+Z)">
+        <button class="icon-btn" @click="redo">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 9H8a5 5 0 0 0 0 10h9"/>
             <polyline points="21 5 21 9 17 9"/>
           </svg>
+          <div class="btn-tip">重做 <kbd>Ctrl ⇧ Z</kbd></div>
         </button>
 
         <div class="toolbar-sep"></div>
 
         <!-- 自动布局 -->
-        <select v-model="layoutType" @change="autoLayout" class="layout-select" title="切换布局（立即应用）">
+        <select v-model="layoutType" @change="autoLayout" class="layout-select">
           <option value="hierarchical">层次</option>
           <option value="tree">树形</option>
           <option value="force">力导向</option>
           <option value="circular">环形</option>
           <option value="grid">网格</option>
         </select>
-        <button class="icon-btn" @click="autoLayout" title="重新应用当前布局">
+        <button class="icon-btn" @click="autoLayout">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="8" y="2" width="8" height="5" rx="1"/>
             <rect x="2" y="17" width="8" height="5" rx="1"/>
@@ -91,19 +95,21 @@
             <line x1="12" y1="13" x2="6" y2="17"/>
             <line x1="12" y1="13" x2="18" y2="17"/>
           </svg>
+          <div class="btn-tip">重新应用布局</div>
         </button>
 
         <div class="toolbar-sep"></div>
 
         <!-- 分组 / 取消分组 -->
-        <button class="icon-btn" @click="groupSelected" :disabled="selectedNodes.length < 2" title="分组（需选中 2 个以上节点）">
+        <button class="icon-btn" @click="groupSelected" :disabled="selectedNodes.length < 2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="2" width="20" height="20" rx="2" stroke-dasharray="3 2"/>
             <rect x="5" y="5" width="6" height="6" rx="1"/>
             <rect x="13" y="13" width="6" height="6" rx="1"/>
           </svg>
+          <div class="btn-tip">分组（需选中 2 个以上节点）</div>
         </button>
-        <button class="icon-btn" @click="ungroupSelected" :disabled="selectedNodes.length === 0" title="取消分组">
+        <button class="icon-btn" @click="ungroupSelected" :disabled="selectedNodes.length === 0">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="5" y="5" width="6" height="6" rx="1"/>
             <rect x="13" y="13" width="6" height="6" rx="1"/>
@@ -112,47 +118,51 @@
             <line x1="22" y1="22" x2="18" y2="18"/>
             <line x1="2" y1="22" x2="6" y2="18"/>
           </svg>
+          <div class="btn-tip">取消分组</div>
         </button>
 
         <div class="toolbar-sep"></div>
 
         <!-- 导入 / 导出 -->
-        <button class="icon-btn" @click="importJSON" title="导入 JSON">
+        <button class="icon-btn" @click="importJSON">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
+          <div class="btn-tip">导入 JSON</div>
         </button>
-        <button class="icon-btn" @click="exportJSON" title="导出 JSON">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/>
-            <path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/>
-          </svg>
-        </button>
-        <button class="icon-btn" @click="exportPNG" title="导出 PNG">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-        </button>
-        <button class="icon-btn" @click="exportSVG" title="导出 SVG">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-            <path d="M2 17l10 5 10-5"/>
-            <path d="M2 12l10 5 10-5"/>
-          </svg>
-        </button>
+        <div class="dropdown-group" @mouseenter="showExportMenu = true" @mouseleave="showExportMenu = false">
+          <button class="icon-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <div class="btn-tip">导出</div>
+          </button>
+          <div class="export-menu" v-show="showExportMenu" @mouseenter="showExportMenu = true" @mouseleave="showExportMenu = false">
+            <div class="export-item" @click="exportJSON(); showExportMenu = false">
+              <span>导出 JSON</span>
+            </div>
+            <div class="export-item" @click="exportPNG(); showExportMenu = false">
+              <span>导出 PNG</span>
+            </div>
+            <div class="export-item" @click="exportSVG(); showExportMenu = false">
+              <span>导出 SVG</span>
+            </div>
+          </div>
+        </div>
 
         <div class="toolbar-sep"></div>
 
         <!-- 清空 -->
-        <button class="icon-btn danger" @click="clear" title="清空画布">
+        <button class="icon-btn danger" @click="clear">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"/>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
           </svg>
+          <div class="btn-tip">清空画布</div>
         </button>
 
       </div>
@@ -163,6 +173,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { GraphiteEditor } from '@recall/graphite'
+
+const showExportMenu = ref(false)
 
 const canvasRef = ref<HTMLCanvasElement>()
 let editor: GraphiteEditor | null = null
@@ -313,7 +325,6 @@ function ungroupSelected() { editor?.ungroupSelected() }
 .main-content {
   flex: 1;
   display: flex;
-  overflow: hidden;
   position: relative;
 }
 
@@ -410,6 +421,7 @@ function ungroupSelected() { editor?.ungroupSelected() }
   transition: background 0.12s, color 0.12s;
   flex-shrink: 0;
   padding: 0;
+  position: relative;
 }
 
 .icon-btn:hover:not(:disabled) {
@@ -453,8 +465,70 @@ function ungroupSelected() { editor?.ungroupSelected() }
   margin-right: 1px;
 }
 
-.layout-select:hover {
-  border-color: #bbb;
-  background: #f2f2f2;
+/* 自定义 tooltip */
+.btn-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.85);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 200;
+}
+
+.icon-btn:hover .btn-tip {
+  opacity: 1;
+}
+
+.btn-tip kbd {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-left: 4px;
+}
+
+/* 导出下拉 */
+.dropdown-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.export-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  min-width: 120px;
+  z-index: 300;
+}
+
+.export-item {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.export-item:hover {
+  background: #f5f5f5;
 }
 </style>
