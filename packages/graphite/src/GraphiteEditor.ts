@@ -104,10 +104,11 @@ export class GraphiteEditor extends EventEmitter {
 
   // 设置事件监听
   private setupEventListeners(): void {
-    // mousedown 只在 canvas 上监听（只有在 canvas 内按下才触发交互）
+    // mousedown / mousemove 只在 canvas 上监听（hover 效果只在 canvas 内生效）
     this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this))
-    // mousemove / mouseup 在 window 上监听，防止鼠标移出 canvas 后状态卡死
-    window.addEventListener('mousemove', this.boundOnMouseMove)
+    this.canvas.addEventListener('mousemove', this.boundOnMouseMove)
+    // mouseup 同时在 window 上监听，防止拖拽时移出 canvas 松手导致状态卡死
+    this.canvas.addEventListener('mouseup', this.boundOnMouseUp)
     window.addEventListener('mouseup', this.boundOnMouseUp)
     this.canvas.addEventListener('wheel', this.onWheel.bind(this))
     this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this))
@@ -1107,7 +1108,8 @@ export class GraphiteEditor extends EventEmitter {
 
   // 销毁
   destroy(): void {
-    window.removeEventListener('mousemove', this.boundOnMouseMove)
+    this.canvas.removeEventListener('mousemove', this.boundOnMouseMove)
+    this.canvas.removeEventListener('mouseup', this.boundOnMouseUp)
     window.removeEventListener('mouseup', this.boundOnMouseUp)
     window.removeEventListener('keydown', this.boundOnKeyDown)
     window.removeEventListener('keyup', this.boundOnKeyUp)
