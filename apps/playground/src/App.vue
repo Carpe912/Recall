@@ -274,24 +274,31 @@ function ungroupSelected() {
 }
 
 .toolbar {
-  height: 60px;
+  min-height: 60px;
   background: #f5f5f5;
   border-bottom: 1px solid #ddd;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 10px 20px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .toolbar h1 {
   font-size: 20px;
   font-weight: 600;
   color: #333;
+  line-height: 36px;
+  white-space: nowrap;
 }
 
 .controls {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 .controls button {
@@ -322,6 +329,8 @@ function ungroupSelected() {
 
 .sidebar {
   width: 250px;
+  min-width: 250px;
+  flex-shrink: 0;
   background: #fafafa;
   border-right: 1px solid #ddd;
   padding: 20px;
@@ -369,6 +378,7 @@ function ungroupSelected() {
 
 .canvas {
   flex: 1;
+  min-width: 0;
   background: #fff;
 }
 </style>

@@ -11,7 +11,8 @@ export class SelectionManager extends EventEmitter {
   // 选择节点
   selectNode(node: Node, multi: boolean = false): void {
     if (!multi) {
-      this.clear()
+      this.selectedNodes.clear()
+      this.selectedEdges.clear()
     }
     this.selectedNodes.add(node)
     this.emit('selectionChanged', this.getSelectedNodeIds())
@@ -26,7 +27,8 @@ export class SelectionManager extends EventEmitter {
   // 选择边
   selectEdge(edge: Edge, multi: boolean = false): void {
     if (!multi) {
-      this.clear()
+      this.selectedNodes.clear()
+      this.selectedEdges.clear()
     }
     this.selectedEdges.add(edge)
     this.emit('selectionChanged', this.getSelectedNodeIds())

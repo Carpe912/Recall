@@ -255,11 +255,8 @@ export class GraphiteEditor extends EventEmitter {
           this.renderer.getCamera().zoom
         )
 
-        // 应用吸附后的位置
-        this.dragManager.drag({ x: snapResult.x, y: snapResult.y })
-
-        // 存储辅助线用于渲染
-        this.snapGuides = snapResult.guides
+        this.dragManager.drag(worldPoint, { x: snapResult.x, y: snapResult.y })
+        this.snapGuides = snapResult.snappedX || snapResult.snappedY ? snapResult.guides : { x: [], y: [] }
       } else {
         this.dragManager.drag(worldPoint)
         this.snapGuides = { x: [], y: [] }
