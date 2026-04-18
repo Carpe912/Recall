@@ -1,31 +1,9 @@
 <template>
   <div class="playground">
-    <div class="toolbar">
-      <h1>Graphite Playground</h1>
-      <div class="controls">
-        <button @click="addNode">Add Node</button>
-        <button @click="addEdge" :disabled="selectedNodes.length !== 2">Add Edge</button>
-        <button @click="undo">Undo</button>
-        <button @click="redo">Redo</button>
-        <select v-model="layoutType" @change="autoLayout" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
-          <option value="hierarchical">层次布局</option>
-          <option value="tree">树形布局</option>
-          <option value="force">力导向布局</option>
-          <option value="circular">环形布局</option>
-          <option value="grid">网格布局</option>
-        </select>
-        <button @click="autoLayout">自动布局</button>
-        <button @click="groupSelected" :disabled="selectedNodes.length < 2">Group</button>
-        <button @click="ungroupSelected" :disabled="selectedNodes.length === 0">Ungroup</button>
-        <button @click="clear">Clear</button>
-        <button @click="exportJSON">Export JSON</button>
-        <button @click="importJSON">Import JSON</button>
-        <button @click="exportPNG">Export PNG</button>
-        <button @click="exportSVG">Export SVG</button>
-      </div>
-    </div>
     <div class="main-content">
       <canvas ref="canvasRef" class="canvas"></canvas>
+
+      <!-- 右侧样式面板 -->
       <div class="sidebar" v-if="selectedNodes.length > 0">
         <h3>节点样式</h3>
         <div class="style-control">
@@ -57,6 +35,127 @@
           <span>{{ nodeStyle.opacity }}</span>
         </div>
       </div>
+
+      <!-- 底部浮动工具栏 -->
+      <div class="floating-toolbar">
+
+        <!-- 节点 / 连线 -->
+        <button class="icon-btn" @click="addNode" title="添加节点">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2"/>
+            <line x1="12" y1="9" x2="12" y2="15"/>
+            <line x1="9" y1="12" x2="15" y2="12"/>
+          </svg>
+        </button>
+        <button class="icon-btn" @click="addEdge" :disabled="selectedNodes.length !== 2" title="添加连线（先选中 2 个节点）">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="5" cy="12" r="2.5"/>
+            <circle cx="19" cy="12" r="2.5"/>
+            <line x1="7.5" y1="12" x2="14" y2="12"/>
+            <polyline points="13 9 16.5 12 13 15"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
+        <!-- 撤销 / 重做 -->
+        <button class="icon-btn" @click="undo" title="撤销 (Ctrl+Z)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9h13a5 5 0 0 1 0 10H7"/>
+            <polyline points="3 5 3 9 7 9"/>
+          </svg>
+        </button>
+        <button class="icon-btn" @click="redo" title="重做 (Ctrl+Shift+Z)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 9H8a5 5 0 0 0 0 10h9"/>
+            <polyline points="21 5 21 9 17 9"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
+        <!-- 自动布局 -->
+        <select v-model="layoutType" @change="autoLayout" class="layout-select" title="切换布局（立即应用）">
+          <option value="hierarchical">层次</option>
+          <option value="tree">树形</option>
+          <option value="force">力导向</option>
+          <option value="circular">环形</option>
+          <option value="grid">网格</option>
+        </select>
+        <button class="icon-btn" @click="autoLayout" title="重新应用当前布局">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="2" width="8" height="5" rx="1"/>
+            <rect x="2" y="17" width="8" height="5" rx="1"/>
+            <rect x="14" y="17" width="8" height="5" rx="1"/>
+            <line x1="12" y1="7" x2="12" y2="13"/>
+            <line x1="12" y1="13" x2="6" y2="17"/>
+            <line x1="12" y1="13" x2="18" y2="17"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
+        <!-- 分组 / 取消分组 -->
+        <button class="icon-btn" @click="groupSelected" :disabled="selectedNodes.length < 2" title="分组（需选中 2 个以上节点）">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2" stroke-dasharray="3 2"/>
+            <rect x="5" y="5" width="6" height="6" rx="1"/>
+            <rect x="13" y="13" width="6" height="6" rx="1"/>
+          </svg>
+        </button>
+        <button class="icon-btn" @click="ungroupSelected" :disabled="selectedNodes.length === 0" title="取消分组">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="5" width="6" height="6" rx="1"/>
+            <rect x="13" y="13" width="6" height="6" rx="1"/>
+            <line x1="2" y1="2" x2="6" y2="6"/>
+            <line x1="22" y1="2" x2="18" y2="6"/>
+            <line x1="22" y1="22" x2="18" y2="18"/>
+            <line x1="2" y1="22" x2="6" y2="18"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
+        <!-- 导入 / 导出 -->
+        <button class="icon-btn" @click="importJSON" title="导入 JSON">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </button>
+        <button class="icon-btn" @click="exportJSON" title="导出 JSON">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/>
+            <path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/>
+          </svg>
+        </button>
+        <button class="icon-btn" @click="exportPNG" title="导出 PNG">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+        </button>
+        <button class="icon-btn" @click="exportSVG" title="导出 SVG">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
+        <!-- 清空 -->
+        <button class="icon-btn danger" @click="clear" title="清空画布">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+        </button>
+
+      </div>
     </div>
   </div>
 </template>
@@ -82,14 +181,11 @@ const nodeStyle = ref({
 onMounted(() => {
   if (!canvasRef.value) return
 
-  // Initialize editor
   editor = new GraphiteEditor(canvasRef.value)
 
-  // Listen to selection changes
   editor.on('selectionChanged', (selection: string[]) => {
     selectedNodes.value = selection
 
-    // 更新样式面板显示当前选中节点的样式
     if (selection.length > 0) {
       const nodes = editor!.getNodes()
       const firstSelected = nodes.find(n => n.id === selection[0])
@@ -106,42 +202,16 @@ onMounted(() => {
     }
   })
 
-  // Create some initial nodes
-  const node1 = editor.createNode({
-    x: 200,
-    y: 150,
-    width: 120,
-    height: 80,
-    content: 'Node 1'
-  })
-
+  const node1 = editor.createNode({ x: 200, y: 150, width: 120, height: 80, content: 'Node 1' })
   const node2 = editor.createNode({
-    x: 400,
-    y: 150,
-    width: 120,
-    height: 80,
-    content: 'Node 2',
-    style: {
-      fill: '#e3f2fd',
-      stroke: '#1976d2',
-      shadowBlur: 10,
-    }
+    x: 400, y: 150, width: 120, height: 80, content: 'Node 2',
+    style: { fill: '#e3f2fd', stroke: '#1976d2', shadowBlur: 10 }
   })
-
   const node3 = editor.createNode({
-    x: 300,
-    y: 300,
-    width: 120,
-    height: 80,
-    content: 'Node 3',
-    style: {
-      fill: '#fff3e0',
-      stroke: '#f57c00',
-      borderRadius: 20,
-    }
+    x: 300, y: 300, width: 120, height: 80, content: 'Node 3',
+    style: { fill: '#fff3e0', stroke: '#f57c00', borderRadius: 20 }
   })
 
-  // Create edges
   editor.createEdge({ from: node1.id, to: node2.id })
   editor.createEdge({ from: node1.id, to: node3.id })
 })
@@ -152,13 +222,9 @@ onUnmounted(() => {
 
 function addNode() {
   if (!editor) return
-
-  const x = Math.random() * 600 + 100
-  const y = Math.random() * 400 + 100
-
   editor.createNode({
-    x,
-    y,
+    x: Math.random() * 600 + 100,
+    y: Math.random() * 400 + 100,
     width: 120,
     height: 80,
     content: `Node ${Date.now()}`
@@ -167,38 +233,21 @@ function addNode() {
 
 function addEdge() {
   if (!editor || selectedNodes.value.length !== 2) return
-
-  editor.createEdge({
-    from: selectedNodes.value[0],
-    to: selectedNodes.value[1]
-  })
+  editor.createEdge({ from: selectedNodes.value[0], to: selectedNodes.value[1] })
 }
 
-function undo() {
-  editor?.undo()
-}
-
-function redo() {
-  editor?.redo()
-}
-
-function autoLayout() {
-  editor?.autoLayout({ type: layoutType.value })
-}
-
-function clear() {
-  editor?.clear()
-}
+function undo() { editor?.undo() }
+function redo() { editor?.redo() }
+function autoLayout() { editor?.autoLayout({ type: layoutType.value }) }
+function clear() { editor?.clear() }
 
 function updateSelectedNodesStyle() {
   if (!editor || selectedNodes.value.length === 0) return
-
   editor.updateNodesStyle(selectedNodes.value, nodeStyle.value)
 }
 
 function exportJSON() {
   if (!editor) return
-
   const json = editor.exportToJSON()
   const blob = new Blob([json], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -211,19 +260,16 @@ function exportJSON() {
 
 function importJSON() {
   if (!editor) return
-
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '.json'
   input.onchange = (e) => {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (!file) return
-
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const json = e.target?.result as string
-        editor!.importFromJSON(json)
+        editor!.importFromJSON(e.target?.result as string)
       } catch (error) {
         alert('导入失败：' + error)
       }
@@ -235,19 +281,15 @@ function importJSON() {
 
 function exportPNG() {
   if (!editor) return
-
-  const dataUrl = editor.exportToPNG()
   const a = document.createElement('a')
-  a.href = dataUrl
+  a.href = editor.exportToPNG()
   a.download = `graphite-${Date.now()}.png`
   a.click()
 }
 
 function exportSVG() {
   if (!editor) return
-
-  const svg = editor.exportToSVG()
-  const blob = new Blob([svg], { type: 'image/svg+xml' })
+  const blob = new Blob([editor.exportToSVG()], { type: 'image/svg+xml' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -256,13 +298,8 @@ function exportSVG() {
   URL.revokeObjectURL(url)
 }
 
-function groupSelected() {
-  editor?.groupSelected('Group')
-}
-
-function ungroupSelected() {
-  editor?.ungroupSelected()
-}
+function groupSelected() { editor?.groupSelected('Group') }
+function ungroupSelected() { editor?.ungroupSelected() }
 </script>
 
 <style scoped>
@@ -273,112 +310,151 @@ function ungroupSelected() {
   flex-direction: column;
 }
 
-.toolbar {
-  min-height: 60px;
-  background: #f5f5f5;
-  border-bottom: 1px solid #ddd;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 10px 20px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.toolbar h1 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-  line-height: 36px;
-  white-space: nowrap;
-}
-
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.controls button {
-  padding: 8px 16px;
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.controls button:hover:not(:disabled) {
-  background: #f0f0f0;
-  border-color: #999;
-}
-
-.controls button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .main-content {
   flex: 1;
   display: flex;
   overflow: hidden;
-}
-
-.sidebar {
-  width: 250px;
-  min-width: 250px;
-  flex-shrink: 0;
-  background: #fafafa;
-  border-right: 1px solid #ddd;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.sidebar h3 {
-  margin: 0 0 20px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-}
-
-.style-control {
-  margin-bottom: 20px;
-}
-
-.style-control label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: #666;
-  font-weight: 500;
-}
-
-.style-control input[type="color"] {
-  width: 100%;
-  height: 36px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.style-control input[type="range"] {
-  width: calc(100% - 50px);
-  margin-right: 10px;
-}
-
-.style-control span {
-  font-size: 12px;
-  color: #666;
-  min-width: 40px;
-  display: inline-block;
+  position: relative;
 }
 
 .canvas {
   flex: 1;
   min-width: 0;
   background: #fff;
+}
+
+/* 右侧样式面板 */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  flex-shrink: 0;
+  background: #fafafa;
+  border-left: 1px solid #e5e5e5;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.sidebar h3 {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.style-control {
+  margin-bottom: 16px;
+}
+
+.style-control label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+.style-control input[type="color"] {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.style-control input[type="range"] {
+  width: calc(100% - 44px);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.style-control span {
+  font-size: 11px;
+  color: #888;
+  min-width: 36px;
+  display: inline-block;
+}
+
+/* 浮动工具栏 */
+.floating-toolbar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 12px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
+  z-index: 100;
+  user-select: none;
+  /* 防止工具栏过宽时出界 */
+  max-width: calc(100% - 40px);
+  flex-wrap: nowrap;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: #f2f2f2;
+  color: #111;
+}
+
+.icon-btn:active:not(:disabled) {
+  background: #e8e8e8;
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.icon-btn.danger:hover:not(:disabled) {
+  background: #fff0f0;
+  color: #d93025;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: #e5e5e5;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.layout-select {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #555;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  margin-right: 1px;
+}
+
+.layout-select:hover {
+  border-color: #bbb;
+  background: #f2f2f2;
 }
 </style>
