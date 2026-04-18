@@ -10,6 +10,7 @@ export class Renderer {
   private dirtyRectManager: DirtyRectManager
   private animationFrameId: number | null = null
   private needsRender: boolean = true
+  private resizeObserver: ResizeObserver
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -24,8 +25,9 @@ export class Renderer {
     // 设置 canvas 尺寸
     this.resize()
 
-    // 监听窗口大小变化
-    window.addEventListener('resize', () => this.resize())
+    // 用 ResizeObserver 监听 canvas 尺寸变化（比 window resize 更及时，能感知布局变化）
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(canvas)
   }
 
   // 调整 canvas 尺寸
@@ -160,6 +162,6 @@ export class Renderer {
   // 销毁
   destroy(): void {
     this.stopRenderLoop()
-    window.removeEventListener('resize', () => this.resize())
+    this.resizeObserver.disconnect()
   }
 }
