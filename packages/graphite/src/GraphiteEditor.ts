@@ -2,6 +2,7 @@ import { Node } from './core/Node'
 import { Edge } from './core/Edge'
 import { Group } from './core/Group'
 import { ImageNode } from './core/ImageNode'
+import { Path } from './core/Path'
 import { Renderer } from './renderer/Renderer'
 import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
@@ -28,6 +29,7 @@ export class GraphiteEditor extends EventEmitter {
   private nodes: Node[] = []
   private edges: Edge[] = []
   private groups: Group[] = []
+  private paths: Path[] = []
   private selectionManager: SelectionManager
   private dragManager: DragManager
   private commandManager: CommandManager
@@ -42,6 +44,11 @@ export class GraphiteEditor extends EventEmitter {
   private panStartPoint: Point | null = null
   private selectionBoxStart: Point | null = null
   private selectionBoxEnd: Point | null = null
+
+  // 铅笔工具状态
+  private isPencilMode: boolean = false
+  private isDrawing: boolean = false
+  private currentPath: Path | null = null
 
   // 连线创建状态
   private isCreatingEdge: boolean = false
@@ -172,6 +179,20 @@ export class GraphiteEditor extends EventEmitter {
       return
     }
 
+    // 铅笔模式
+    if (this.isPencilMode && e.button === 0) {
+      this.isDrawing = true
+      this.currentPath = new Path({
+        points: [worldPoint],
+        style: {
+          stroke: this.themeManager.getColors().text,
+          strokeWidth: 2,
+        },
+      })
+      this.canvas.style.cursor = 'crosshair'
+      return
+    }
+
     // 左键
     if (e.button === 0) {
       // 检查是否点击了节点
@@ -237,6 +258,13 @@ export class GraphiteEditor extends EventEmitter {
     const point = this.getMousePosition(e)
     const worldPoint = this.renderer.getCamera().screenToWorld(point)
     const isOverCanvas = this.isPointOverCanvas(e)
+
+    // 铅笔绘制
+    if (this.isDrawing && this.currentPath) {
+      this.currentPath.addPoint(worldPoint)
+      this.renderer.markDirty()
+      return
+    }
 
     // 平移画布
     if (this.isPanning && this.panStartPoint) {
@@ -364,6 +392,19 @@ export class GraphiteEditor extends EventEmitter {
   private onMouseUp(e: MouseEvent): void {
     const point = this.getMousePosition(e)
     const worldPoint = this.renderer.getCamera().screenToWorld(point)
+
+    // 结束铅笔绘制
+    if (this.isDrawing && this.currentPath) {
+      this.isDrawing = false
+      // 简化路径
+      this.currentPath.simplify(2)
+      // 添加到路径列表
+      this.paths.push(this.currentPath)
+      this.currentPath = null
+      this.canvas.style.cursor = this.isPencilMode ? 'crosshair' : 'default'
+      this.renderer.markDirty()
+      return
+    }
 
     // 结束平移
     if (this.isPanning) {
@@ -831,6 +872,9 @@ export class GraphiteEditor extends EventEmitter {
     // 绘制分组（在节点下方）
     this.drawGroups()
 
+    // 绘制路径
+    this.drawPaths()
+
     // 绘制选择框
     if (this.selectionBoxStart && this.selectionBoxEnd) {
       this.drawSelectionBox()
@@ -857,6 +901,29 @@ export class GraphiteEditor extends EventEmitter {
       this.canvas.width,
       this.canvas.height
     )
+  }
+
+  // 绘制路径
+  private drawPaths(): void {
+    if (this.paths.length === 0 && !this.currentPath) return
+
+    const ctx = this.renderer.getContext()
+    const camera = this.renderer.getCamera()
+
+    ctx.save()
+    camera.applyTransform(ctx)
+
+    // 绘制已完成的路径
+    this.paths.forEach(path => {
+      path.draw(ctx)
+    })
+
+    // 绘制正在绘制的路径
+    if (this.currentPath) {
+      this.currentPath.draw(ctx)
+    }
+
+    ctx.restore()
   }
 
   // 绘制分组
@@ -1055,6 +1122,30 @@ export class GraphiteEditor extends EventEmitter {
     this.updateEdges()
     this.renderer.markDirty()
     return edge
+  }
+
+  // 切换铅笔模式
+  setPencilMode(enabled: boolean): void {
+    this.isPencilMode = enabled
+    if (enabled) {
+      this.canvas.style.cursor = 'crosshair'
+    } else {
+      this.canvas.style.cursor = 'default'
+      // 如果正在绘制，结束绘制
+      if (this.isDrawing && this.currentPath) {
+        this.currentPath.simplify(2)
+        this.paths.push(this.currentPath)
+        this.currentPath = null
+        this.isDrawing = false
+        this.renderer.markDirty()
+      }
+    }
+    this.emit('pencilModeChanged', enabled)
+  }
+
+  // 获取铅笔模式状态
+  isPencilModeEnabled(): boolean {
+    return this.isPencilMode
   }
 
   // 删除选中的对象

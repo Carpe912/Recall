@@ -82,6 +82,19 @@
 
         <div class="toolbar-sep"></div>
 
+        <!-- 铅笔工具 -->
+        <button class="icon-btn" @click="togglePencilMode" :class="{ active: isPencilMode }">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+            <path d="M2 2l7.586 7.586"/>
+            <circle cx="11" cy="11" r="2"/>
+          </svg>
+          <div class="btn-tip">铅笔工具（自由绘制）</div>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
         <!-- 撤销 / 重做 -->
         <button class="icon-btn" @click="undo">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -295,6 +308,7 @@ const nodeShape = ref<'rectangle' | 'circle' | 'diamond' | 'triangle'>('rectangl
 const edgeLineStyle = ref<'straight' | 'curved' | 'orthogonal'>('straight')
 const theme = ref<'light' | 'dark'>('light')
 const useSmartRouting = ref(false)
+const isPencilMode = ref(false)
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -389,6 +403,12 @@ function toggleSmartRouting() {
       editor!.updateEdgeStyle(edge.id, { useSmartRouting: useSmartRouting.value })
     }
   })
+}
+
+function togglePencilMode() {
+  isPencilMode.value = !isPencilMode.value
+  if (!editor) return
+  editor.setPencilMode(isPencilMode.value)
 }
 
 // 对齐工具
