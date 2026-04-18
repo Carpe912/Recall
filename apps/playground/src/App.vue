@@ -25,6 +25,7 @@
       </div>
     </div>
     <div class="main-content">
+      <canvas ref="canvasRef" class="canvas"></canvas>
       <div class="sidebar" v-if="selectedNodes.length > 0">
         <h3>节点样式</h3>
         <div class="style-control">
@@ -56,7 +57,6 @@
           <span>{{ nodeStyle.opacity }}</span>
         </div>
       </div>
-      <canvas ref="canvasRef" class="canvas"></canvas>
     </div>
   </div>
 </template>
