@@ -27,6 +27,7 @@ export interface NodeData {
   width: number
   height: number
   content: string
+  shape?: 'rectangle' | 'circle' | 'diamond' | 'triangle'
   style?: NodeStyle
 }
 
@@ -42,6 +43,7 @@ export interface NodeStyle {
   shadowOffsetX?: number
   shadowOffsetY?: number
   opacity?: number
+  shape?: 'rectangle' | 'circle' | 'diamond' | 'triangle'
 }
 
 export interface EdgeData {

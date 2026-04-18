@@ -48,6 +48,12 @@
           </svg>
           <div class="btn-tip">添加节点</div>
         </button>
+        <select v-model="nodeShape" class="shape-select" title="节点形状">
+          <option value="rectangle">矩形</option>
+          <option value="circle">圆形</option>
+          <option value="diamond">菱形</option>
+          <option value="triangle">三角形</option>
+        </select>
         <button class="icon-btn" @click="addEdge" :disabled="selectedNodes.length !== 2">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="5" cy="12" r="2.5"/>
@@ -180,6 +186,7 @@ const canvasRef = ref<HTMLCanvasElement>()
 let editor: GraphiteEditor | null = null
 const selectedNodes = ref<string[]>([])
 const layoutType = ref<'hierarchical' | 'tree' | 'force' | 'circular' | 'grid'>('hierarchical')
+const nodeShape = ref<'rectangle' | 'circle' | 'diamond' | 'triangle'>('rectangle')
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -239,7 +246,8 @@ function addNode() {
     y: Math.random() * 400 + 100,
     width: 120,
     height: 80,
-    content: `Node ${Date.now()}`
+    content: `Node ${Date.now()}`,
+    shape: nodeShape.value
   })
 }
 
@@ -463,6 +471,26 @@ function ungroupSelected() { editor?.ungroupSelected() }
   outline: none;
   flex-shrink: 0;
   margin-right: 1px;
+}
+
+.shape-select {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid #e2e2e2;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #555;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  margin-left: 1px;
+}
+
+.shape-select:hover,
+.layout-select:hover {
+  border-color: #bbb;
+  background: #f2f2f2;
 }
 
 /* 自定义 tooltip */

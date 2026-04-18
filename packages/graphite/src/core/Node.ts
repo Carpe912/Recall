@@ -6,6 +6,7 @@ export class Node extends GraphicObject {
   width: number
   height: number
   content: string
+  shape: 'rectangle' | 'circle' | 'diamond' | 'triangle'
   style: Required<NodeStyle>
 
   constructor(data: NodeData) {
@@ -13,6 +14,7 @@ export class Node extends GraphicObject {
     this.width = data.width
     this.height = data.height
     this.content = data.content
+    this.shape = data.shape || 'rectangle'
     this.transform.x = data.x
     this.transform.y = data.y
 
@@ -29,6 +31,7 @@ export class Node extends GraphicObject {
       shadowOffsetX: data.style?.shadowOffsetX || 0,
       shadowOffsetY: data.style?.shadowOffsetY || 0,
       opacity: data.style?.opacity || 1,
+      shape: data.style?.shape || this.shape,
     }
   }
 
@@ -53,22 +56,25 @@ export class Node extends GraphicObject {
       ctx.shadowOffsetY = this.style.shadowOffsetY
     }
 
-    // 绘制矩形（带圆角）
-    const x = -this.width / 2
-    const y = -this.height / 2
-    const radius = this.style.borderRadius
-
+    // 根据形状类型绘制
+    const shape = this.style.shape || this.shape
     ctx.beginPath()
-    ctx.moveTo(x + radius, y)
-    ctx.lineTo(x + this.width - radius, y)
-    ctx.quadraticCurveTo(x + this.width, y, x + this.width, y + radius)
-    ctx.lineTo(x + this.width, y + this.height - radius)
-    ctx.quadraticCurveTo(x + this.width, y + this.height, x + this.width - radius, y + this.height)
-    ctx.lineTo(x + radius, y + this.height)
-    ctx.quadraticCurveTo(x, y + this.height, x, y + this.height - radius)
-    ctx.lineTo(x, y + radius)
-    ctx.quadraticCurveTo(x, y, x + radius, y)
-    ctx.closePath()
+
+    switch (shape) {
+      case 'circle':
+        this.drawCircle(ctx)
+        break
+      case 'diamond':
+        this.drawDiamond(ctx)
+        break
+      case 'triangle':
+        this.drawTriangle(ctx)
+        break
+      case 'rectangle':
+      default:
+        this.drawRectangle(ctx)
+        break
+    }
 
     // 填充
     ctx.fillStyle = this.style.fill
@@ -92,6 +98,53 @@ export class Node extends GraphicObject {
     }
 
     ctx.restore()
+  }
+
+  // 绘制矩形
+  private drawRectangle(ctx: CanvasRenderingContext2D): void {
+    const x = -this.width / 2
+    const y = -this.height / 2
+    const radius = this.style.borderRadius
+
+    ctx.moveTo(x + radius, y)
+    ctx.lineTo(x + this.width - radius, y)
+    ctx.quadraticCurveTo(x + this.width, y, x + this.width, y + radius)
+    ctx.lineTo(x + this.width, y + this.height - radius)
+    ctx.quadraticCurveTo(x + this.width, y + this.height, x + this.width - radius, y + this.height)
+    ctx.lineTo(x + radius, y + this.height)
+    ctx.quadraticCurveTo(x, y + this.height, x, y + this.height - radius)
+    ctx.lineTo(x, y + radius)
+    ctx.quadraticCurveTo(x, y, x + radius, y)
+    ctx.closePath()
+  }
+
+  // 绘制圆形
+  private drawCircle(ctx: CanvasRenderingContext2D): void {
+    const radius = Math.min(this.width, this.height) / 2
+    ctx.arc(0, 0, radius, 0, Math.PI * 2)
+  }
+
+  // 绘制菱形
+  private drawDiamond(ctx: CanvasRenderingContext2D): void {
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    ctx.moveTo(0, -halfHeight)           // 顶部
+    ctx.lineTo(halfWidth, 0)             // 右侧
+    ctx.lineTo(0, halfHeight)            // 底部
+    ctx.lineTo(-halfWidth, 0)            // 左侧
+    ctx.closePath()
+  }
+
+  // 绘制三角形
+  private drawTriangle(ctx: CanvasRenderingContext2D): void {
+    const halfWidth = this.width / 2
+    const halfHeight = this.height / 2
+
+    ctx.moveTo(0, -halfHeight)           // 顶部
+    ctx.lineTo(halfWidth, halfHeight)    // 右下
+    ctx.lineTo(-halfWidth, halfHeight)   // 左下
+    ctx.closePath()
   }
 
   // 绘制连接点
@@ -213,10 +266,40 @@ export class Node extends GraphicObject {
 
   hitTest(x: number, y: number): boolean {
     const local = this.worldToLocal({ x, y })
-    return (
-      Math.abs(local.x) <= this.width / 2 &&
-      Math.abs(local.y) <= this.height / 2
-    )
+    const shape = this.style.shape || this.shape
+
+    switch (shape) {
+      case 'circle': {
+        const radius = Math.min(this.width, this.height) / 2
+        const distance = Math.sqrt(local.x * local.x + local.y * local.y)
+        return distance <= radius
+      }
+      case 'diamond': {
+        const halfWidth = this.width / 2
+        const halfHeight = this.height / 2
+        // 菱形碰撞检测：点到四条边的距离
+        const dx = Math.abs(local.x) / halfWidth
+        const dy = Math.abs(local.y) / halfHeight
+        return dx + dy <= 1
+      }
+      case 'triangle': {
+        const halfWidth = this.width / 2
+        const halfHeight = this.height / 2
+        // 三角形碰撞检测：检查点是否在三角形内
+        // 顶点：(0, -halfHeight), (halfWidth, halfHeight), (-halfWidth, halfHeight)
+        if (local.y < -halfHeight || local.y > halfHeight) return false
+        // 检查是否在左右边界内
+        const ratio = (local.y + halfHeight) / (2 * halfHeight)
+        const maxX = halfWidth * (1 - ratio * 2)
+        return Math.abs(local.x) <= Math.abs(maxX)
+      }
+      case 'rectangle':
+      default:
+        return (
+          Math.abs(local.x) <= this.width / 2 &&
+          Math.abs(local.y) <= this.height / 2
+        )
+    }
   }
 
   getBounds(): Rect {
@@ -235,6 +318,7 @@ export class Node extends GraphicObject {
       width: this.width,
       height: this.height,
       content: this.content,
+      shape: this.shape,
       style: { ...this.style },
     })
   }
