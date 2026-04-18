@@ -1,5 +1,6 @@
 import { Node } from './core/Node'
 import { Edge } from './core/Edge'
+import { Group } from './core/Group'
 import { Renderer } from './renderer/Renderer'
 import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
@@ -24,6 +25,7 @@ export class GraphiteEditor extends EventEmitter {
   private renderer: Renderer
   private nodes: Node[] = []
   private edges: Edge[] = []
+  private groups: Group[] = []
   private selectionManager: SelectionManager
   private dragManager: DragManager
   private commandManager: CommandManager
@@ -608,6 +610,9 @@ export class GraphiteEditor extends EventEmitter {
     const hoveredNodeIds = this.hoveredNode ? [this.hoveredNode.id] : []
     this.renderer.render(this.nodes, this.edges, hoveredNodeIds)
 
+    // 绘制分组（在节点下方）
+    this.drawGroups()
+
     // 绘制选择框
     if (this.selectionBoxStart && this.selectionBoxEnd) {
       this.drawSelectionBox()
@@ -634,6 +639,25 @@ export class GraphiteEditor extends EventEmitter {
       this.canvas.width,
       this.canvas.height
     )
+  }
+
+  // 绘制分组
+  private drawGroups(): void {
+    if (this.groups.length === 0) return
+
+    const ctx = this.renderer.getContext()
+    const camera = this.renderer.getCamera()
+
+    ctx.save()
+    camera.applyTransform(ctx)
+
+    // 先更新分组边界，再绘制（绘制在最底层）
+    this.groups.forEach(group => {
+      group.updateBoundsFromNodes()
+      group.draw(ctx)
+    })
+
+    ctx.restore()
   }
 
   // 绘制吸附辅助线
@@ -856,6 +880,7 @@ export class GraphiteEditor extends EventEmitter {
   clear(): void {
     this.nodes = []
     this.edges = []
+    this.groups = []
     this.selectionManager.clear()
     this.commandManager.clear()
     this.renderer.markDirty()
@@ -1016,6 +1041,40 @@ export class GraphiteEditor extends EventEmitter {
       }
     })
     this.renderer.markDirty()
+  }
+
+  // 分组选中节点
+  groupSelected(label: string = 'Group'): Group | null {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    if (selectedNodes.length < 2) return null
+
+    const group = new Group(selectedNodes, label)
+    this.groups.push(group)
+    this.renderer.markDirty()
+    return group
+  }
+
+  // 解除分组
+  ungroup(group: Group): void {
+    const idx = this.groups.indexOf(group)
+    if (idx !== -1) {
+      this.groups.splice(idx, 1)
+      this.renderer.markDirty()
+    }
+  }
+
+  // 解除选中节点所在的所有分组
+  ungroupSelected(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    const groupsToRemove = this.groups.filter(g =>
+      selectedNodes.some(n => g.containsNode(n))
+    )
+    groupsToRemove.forEach(g => this.ungroup(g))
+  }
+
+  // 获取所有分组
+  getGroups(): Group[] {
+    return this.groups
   }
 
   // 销毁

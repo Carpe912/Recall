@@ -15,6 +15,8 @@
           <option value="circular">环形布局</option>
           <option value="grid">网格布局</option>
         </select>
+        <button @click="groupSelected" :disabled="selectedNodes.length < 2">Group</button>
+        <button @click="ungroupSelected" :disabled="selectedNodes.length === 0">Ungroup</button>
         <button @click="clear">Clear</button>
         <button @click="exportJSON">Export JSON</button>
         <button @click="importJSON">Import JSON</button>
@@ -252,6 +254,14 @@ function exportSVG() {
   a.download = `graphite-${Date.now()}.svg`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function groupSelected() {
+  editor?.groupSelected('Group')
+}
+
+function ungroupSelected() {
+  editor?.ungroupSelected()
 }
 </script>
 
