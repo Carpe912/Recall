@@ -202,7 +202,11 @@ export class Edge extends GraphicObject {
     const dy = endCenter.y - startCenter.y
     const distance = Math.sqrt(dx * dx + dy * dy)
 
-    if (distance === 0) return
+    // 节点完全重叠时，直接将 points 设为两个相同的点并退出
+    if (distance === 0) {
+      this.points = [{ ...startCenter }, { ...endCenter }]
+      return
+    }
 
     const dirX = dx / distance
     const dirY = dy / distance
