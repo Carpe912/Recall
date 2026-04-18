@@ -12,7 +12,7 @@ import {
   DeleteEdgeCommand,
 } from './interaction/Commands'
 import { EventEmitter } from './utils/EventEmitter'
-import type { NodeData, EdgeData, Point, NodeStyle } from './types'
+import type { NodeData, EdgeData, Point, NodeStyle, EdgeStyle } from './types'
 
 export class GraphiteEditor extends EventEmitter {
   private canvas: HTMLCanvasElement
@@ -729,6 +729,20 @@ export class GraphiteEditor extends EventEmitter {
   // 批量更新节点样式
   updateNodesStyle(nodeIds: string[], style: Partial<NodeStyle>): void {
     nodeIds.forEach(id => this.updateNodeStyle(id, style))
+  }
+
+  // 更新边样式
+  updateEdgeStyle(edgeId: string, style: Partial<EdgeStyle>): void {
+    const edge = this.edges.find(e => e.id === edgeId)
+    if (!edge) return
+
+    Object.assign(edge.style, style)
+    this.renderer.markDirty()
+  }
+
+  // 批量更新边样式
+  updateEdgesStyle(edgeIds: string[], style: Partial<EdgeStyle>): void {
+    edgeIds.forEach(id => this.updateEdgeStyle(id, style))
   }
 
   // 销毁

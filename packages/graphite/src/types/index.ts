@@ -55,6 +55,9 @@ export interface EdgeStyle {
   stroke?: string
   strokeWidth?: number
   strokeDasharray?: string
+  arrowType?: 'arrow' | 'circle' | 'diamond' | 'none'
+  arrowSize?: number
+  opacity?: number
 }
 
 export interface PortData {

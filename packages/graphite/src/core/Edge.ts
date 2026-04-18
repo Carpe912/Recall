@@ -21,6 +21,9 @@ export class Edge extends GraphicObject {
       stroke: data.style?.stroke || '#666666',
       strokeWidth: data.style?.strokeWidth || 2,
       strokeDasharray: data.style?.strokeDasharray || '',
+      arrowType: data.style?.arrowType || 'arrow',
+      arrowSize: data.style?.arrowSize || 10,
+      opacity: data.style?.opacity || 1,
     }
   }
 
@@ -28,6 +31,9 @@ export class Edge extends GraphicObject {
     if (!this.visible || this.points.length < 2) return
 
     ctx.save()
+
+    // 应用透明度
+    ctx.globalAlpha = this.style.opacity
 
     ctx.strokeStyle = this.style.stroke
     ctx.lineWidth = this.style.strokeWidth
@@ -37,43 +43,63 @@ export class Edge extends GraphicObject {
       ctx.setLineDash(dashArray)
     }
 
-    // 绘制路径（转角处使用圆角）
-    const radius = 8 // 转角圆角半径
+    // 绘制路径
     ctx.beginPath()
     ctx.moveTo(this.points[0].x, this.points[0].y)
 
-    for (let i = 1; i < this.points.length - 1; i++) {
-      const prev = this.points[i - 1]
-      const curr = this.points[i]
-      const next = this.points[i + 1]
-
-      // 计算圆角的控制点
-      const d1 = Math.sqrt((curr.x - prev.x) ** 2 + (curr.y - prev.y) ** 2)
-      const d2 = Math.sqrt((next.x - curr.x) ** 2 + (next.y - curr.y) ** 2)
-      const r = Math.min(radius, d1 / 2, d2 / 2)
-
-      // 进入转角前的点
-      const t1x = curr.x - (curr.x - prev.x) / d1 * r
-      const t1y = curr.y - (curr.y - prev.y) / d1 * r
-
-      // 离开转角后的点
-      const t2x = curr.x + (next.x - curr.x) / d2 * r
-      const t2y = curr.y + (next.y - curr.y) / d2 * r
-
-      ctx.lineTo(t1x, t1y)
-      ctx.quadraticCurveTo(curr.x, curr.y, t2x, t2y)
+    for (let i = 1; i < this.points.length; i++) {
+      ctx.lineTo(this.points[i].x, this.points[i].y)
     }
-
-    ctx.lineTo(this.points[this.points.length - 1].x, this.points[this.points.length - 1].y)
 
     ctx.stroke()
     ctx.setLineDash([])
 
     // 绘制箭头
-    const lastPoint = this.points[this.points.length - 1]
-    const secondLastPoint = this.points[this.points.length - 2]
-    ctx.fillStyle = this.style.stroke
-    drawArrow(ctx, secondLastPoint, lastPoint, 10)
+    if (this.style.arrowType !== 'none' && this.points.length >= 2) {
+      const lastPoint = this.points[this.points.length - 1]
+      const secondLastPoint = this.points[this.points.length - 2]
+
+      ctx.fillStyle = this.style.stroke
+      ctx.strokeStyle = this.style.stroke
+
+      switch (this.style.arrowType) {
+        case 'arrow':
+          drawArrow(ctx, secondLastPoint, lastPoint, this.style.arrowSize)
+          break
+        case 'circle':
+          this.drawCircleArrow(ctx, lastPoint, this.style.arrowSize)
+          break
+        case 'diamond':
+          this.drawDiamondArrow(ctx, secondLastPoint, lastPoint, this.style.arrowSize)
+          break
+      }
+    }
+
+    ctx.restore()
+  }
+
+  // 绘制圆形箭头
+  private drawCircleArrow(ctx: CanvasRenderingContext2D, point: Point, size: number): void {
+    ctx.beginPath()
+    ctx.arc(point.x, point.y, size / 2, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // 绘制菱形箭头
+  private drawDiamondArrow(ctx: CanvasRenderingContext2D, from: Point, to: Point, size: number): void {
+    const angle = Math.atan2(to.y - from.y, to.x - from.x)
+
+    ctx.save()
+    ctx.translate(to.x, to.y)
+    ctx.rotate(angle)
+
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(-size, -size / 2)
+    ctx.lineTo(-size * 1.5, 0)
+    ctx.lineTo(-size, size / 2)
+    ctx.closePath()
+    ctx.fill()
 
     ctx.restore()
   }
