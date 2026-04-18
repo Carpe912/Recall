@@ -5,6 +5,7 @@ import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
 import { CommandManager } from './interaction/CommandManager'
 import { ContextMenu } from './ui/ContextMenu'
+import { SnapGuide } from './utils/SnapGuide'
 import {
   MoveCommand,
   CreateNodeCommand,
@@ -24,6 +25,7 @@ export class GraphiteEditor extends EventEmitter {
   private dragManager: DragManager
   private commandManager: CommandManager
   private contextMenu: ContextMenu
+  private snapGuide: SnapGuide
 
   // 交互状态
   private isSpacePressed: boolean = false
@@ -50,6 +52,9 @@ export class GraphiteEditor extends EventEmitter {
   // 悬浮状态
   private hoveredNode: Node | null = null
 
+  // 吸附辅助线
+  private snapGuides: { x: number[]; y: number[] } = { x: [], y: [] }
+
   // 剪贴板
   private clipboard: {
     nodes: Node[]
@@ -64,6 +69,7 @@ export class GraphiteEditor extends EventEmitter {
     this.dragManager = new DragManager()
     this.commandManager = new CommandManager()
     this.contextMenu = new ContextMenu()
+    this.snapGuide = new SnapGuide()
 
     this.setupEventListeners()
     this.startRenderLoop()
@@ -220,7 +226,29 @@ export class GraphiteEditor extends EventEmitter {
 
     // 拖拽节点
     if (this.dragManager.isDraggingActive()) {
-      this.dragManager.drag(worldPoint)
+      const draggedNodes = this.dragManager.getDraggedNodes()
+
+      // 如果只拖拽一个节点，应用吸附
+      if (draggedNodes.length === 1) {
+        const node = draggedNodes[0]
+        const snapResult = this.snapGuide.snap(
+          node,
+          worldPoint.x,
+          worldPoint.y,
+          this.nodes,
+          this.renderer.getCamera().zoom
+        )
+
+        // 应用吸附后的位置
+        this.dragManager.drag({ x: snapResult.x, y: snapResult.y })
+
+        // 存储辅助线用于渲染
+        this.snapGuides = snapResult.guides
+      } else {
+        this.dragManager.drag(worldPoint)
+        this.snapGuides = { x: [], y: [] }
+      }
+
       return
     }
 
@@ -318,6 +346,7 @@ export class GraphiteEditor extends EventEmitter {
     // 结束拖拽
     if (this.dragManager.isDraggingActive()) {
       this.dragManager.endDrag(worldPoint)
+      this.snapGuides = { x: [], y: [] }
       return
     }
 
@@ -577,6 +606,43 @@ export class GraphiteEditor extends EventEmitter {
     if (this.isCreatingEdge && this.edgeStartNode && this.edgePreviewEnd) {
       this.drawEdgePreview()
     }
+
+    // 绘制吸附辅助线
+    if (this.snapGuides.x.length > 0 || this.snapGuides.y.length > 0) {
+      this.drawSnapGuides()
+    }
+  }
+
+  // 绘制吸附辅助线
+  private drawSnapGuides(): void {
+    const ctx = this.renderer.getContext()
+    const camera = this.renderer.getCamera()
+
+    ctx.save()
+    camera.applyTransform(ctx)
+
+    ctx.strokeStyle = '#FF6B6B'
+    ctx.lineWidth = 1 / camera.zoom
+    ctx.setLineDash([5 / camera.zoom, 5 / camera.zoom])
+
+    // 绘制垂直辅助线
+    this.snapGuides.x.forEach(x => {
+      ctx.beginPath()
+      ctx.moveTo(x, -10000)
+      ctx.lineTo(x, 10000)
+      ctx.stroke()
+    })
+
+    // 绘制水平辅助线
+    this.snapGuides.y.forEach(y => {
+      ctx.beginPath()
+      ctx.moveTo(-10000, y)
+      ctx.lineTo(10000, y)
+      ctx.stroke()
+    })
+
+    ctx.setLineDash([])
+    ctx.restore()
   }
 
   // 绘制选择框
