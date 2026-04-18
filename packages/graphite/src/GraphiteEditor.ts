@@ -67,6 +67,11 @@ export class GraphiteEditor extends EventEmitter {
     edges: Edge[]
   } = { nodes: [], edges: [] }
 
+  // 文本编辑状态
+  private isEditingText: boolean = false
+  private editingNode: Node | null = null
+  private textInput: HTMLTextAreaElement | null = null
+
   // 保存绑定后的函数引用，用于注销事件
   private boundOnMouseMove: (e: MouseEvent) => void
   private boundOnMouseUp: (e: MouseEvent) => void
@@ -106,6 +111,7 @@ export class GraphiteEditor extends EventEmitter {
   private setupEventListeners(): void {
     // mousedown / mousemove 只在 canvas 上监听（hover 效果只在 canvas 内生效）
     this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this))
+    this.canvas.addEventListener('dblclick', this.onDoubleClick.bind(this))
     this.canvas.addEventListener('mousemove', this.boundOnMouseMove)
     // mouseup 同时在 window 上监听，防止拖拽时移出 canvas 松手导致状态卡死
     this.canvas.addEventListener('mouseup', this.boundOnMouseUp)
@@ -412,6 +418,94 @@ export class GraphiteEditor extends EventEmitter {
 
     this.renderer.getCamera().scale(delta, point.x, point.y)
     this.renderer.markDirty()
+  }
+
+  // 双击事件（编辑文本）
+  private onDoubleClick(e: MouseEvent): void {
+    if (this.isEditingText) return
+
+    const point = this.getMousePosition(e)
+    const worldPoint = this.renderer.getCamera().screenToWorld(point)
+
+    const clickedNode = this.findNodeAt(worldPoint)
+    if (clickedNode) {
+      this.startTextEditing(clickedNode)
+    }
+  }
+
+  // 开始文本编辑
+  private startTextEditing(node: Node): void {
+    this.isEditingText = true
+    this.editingNode = node
+
+    // 创建 textarea
+    const textarea = document.createElement('textarea')
+    textarea.value = node.content
+    textarea.style.cssText = `
+      position: absolute;
+      background: white;
+      border: 2px solid #4A90E2;
+      border-radius: 4px;
+      padding: 4px;
+      font-size: ${node.style.fontSize}px;
+      font-family: sans-serif;
+      color: ${node.style.fontColor};
+      resize: none;
+      outline: none;
+      z-index: 1000;
+      overflow: hidden;
+    `
+
+    // 计算 textarea 位置（屏幕坐标）
+    const camera = this.renderer.getCamera()
+    const center = node.getCenter()
+    const screenPos = camera.worldToScreen(center)
+    const rect = this.canvas.getBoundingClientRect()
+
+    // 设置 textarea 尺寸和位置
+    const width = node.width
+    const height = node.height
+    textarea.style.width = `${width}px`
+    textarea.style.height = `${height}px`
+    textarea.style.left = `${rect.left + screenPos.x - width / 2}px`
+    textarea.style.top = `${rect.top + screenPos.y - height / 2}px`
+
+    document.body.appendChild(textarea)
+    this.textInput = textarea
+
+    // 聚焦并选中所有文本
+    textarea.focus()
+    textarea.select()
+
+    // 监听事件
+    const finishEditing = () => {
+      if (this.textInput && this.editingNode) {
+        this.editingNode.setContent(this.textInput.value)
+        this.renderer.markDirty()
+      }
+      this.endTextEditing()
+    }
+
+    textarea.addEventListener('blur', finishEditing)
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        finishEditing()
+      }
+      if (e.key === 'Escape') {
+        this.endTextEditing()
+      }
+    })
+  }
+
+  // 结束文本编辑
+  private endTextEditing(): void {
+    if (this.textInput) {
+      document.body.removeChild(this.textInput)
+      this.textInput = null
+    }
+    this.isEditingText = false
+    this.editingNode = null
   }
 
   // 右键菜单

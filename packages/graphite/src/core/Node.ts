@@ -336,4 +336,9 @@ export class Node extends GraphicObject {
 
     return distance <= handleRadius
   }
+
+  // 设置文本内容
+  setContent(content: string): void {
+    this.content = content
+  }
 }
