@@ -48,6 +48,12 @@ export class GraphiteEditor extends EventEmitter {
   // 悬浮状态
   private hoveredNode: Node | null = null
 
+  // 剪贴板
+  private clipboard: {
+    nodes: Node[]
+    edges: Edge[]
+  } = { nodes: [], edges: [] }
+
   constructor(canvas: HTMLCanvasElement) {
     super()
     this.canvas = canvas
@@ -365,6 +371,24 @@ export class GraphiteEditor extends EventEmitter {
     if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.code === 'KeyZ' || e.code === 'KeyY')) {
       e.preventDefault()
       this.redo()
+    }
+
+    // Ctrl/Cmd + C 复制
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyC') {
+      e.preventDefault()
+      this.copy()
+    }
+
+    // Ctrl/Cmd + X 剪切
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyX') {
+      e.preventDefault()
+      this.cut()
+    }
+
+    // Ctrl/Cmd + V 粘贴
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyV') {
+      e.preventDefault()
+      this.paste()
     }
   }
 
@@ -743,6 +767,92 @@ export class GraphiteEditor extends EventEmitter {
   // 批量更新边样式
   updateEdgesStyle(edgeIds: string[], style: Partial<EdgeStyle>): void {
     edgeIds.forEach(id => this.updateEdgeStyle(id, style))
+  }
+
+  // 复制
+  copy(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    const selectedEdges = this.selectionManager.getSelectedEdges()
+
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return
+
+    // 克隆选中的节点
+    this.clipboard.nodes = selectedNodes.map(node => node.clone())
+
+    // 克隆选中的边（只克隆两端都在选中节点中的边）
+    const selectedNodeIds = new Set(selectedNodes.map(n => n.id))
+    this.clipboard.edges = selectedEdges
+      .filter(edge => selectedNodeIds.has(edge.fromNodeId) && selectedNodeIds.has(edge.toNodeId))
+      .map(edge => edge.clone())
+  }
+
+  // 剪切
+  cut(): void {
+    this.copy()
+    this.deleteSelected()
+  }
+
+  // 粘贴
+  paste(): void {
+    if (this.clipboard.nodes.length === 0) return
+
+    // 清除当前选择
+    this.selectionManager.clear()
+
+    // 创建节点ID映射（旧ID -> 新ID）
+    const idMap = new Map<string, string>()
+
+    // 粘贴节点（偏移一定距离）
+    const offset = 30
+    const newNodes: Node[] = []
+
+    this.clipboard.nodes.forEach(node => {
+      const clonedNode = node.clone()
+      const oldId = node.id
+
+      // 生成新ID
+      clonedNode.id = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      idMap.set(oldId, clonedNode.id)
+
+      // 偏移位置
+      clonedNode.setPosition(
+        clonedNode.transform.x + offset,
+        clonedNode.transform.y + offset
+      )
+
+      // 添加到画布
+      const command = new CreateNodeCommand(clonedNode, this.nodes)
+      this.commandManager.execute(command)
+
+      newNodes.push(clonedNode)
+      this.selectionManager.selectNode(clonedNode, true)
+    })
+
+    // 粘贴边
+    this.clipboard.edges.forEach(edge => {
+      const newFromId = idMap.get(edge.fromNodeId)
+      const newToId = idMap.get(edge.toNodeId)
+
+      if (!newFromId || !newToId) return
+
+      const fromNode = this.nodes.find(n => n.id === newFromId)
+      const toNode = this.nodes.find(n => n.id === newToId)
+
+      if (!fromNode || !toNode) return
+
+      const clonedEdge = edge.clone()
+      clonedEdge.id = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+      clonedEdge.fromNodeId = newFromId
+      clonedEdge.toNodeId = newToId
+      clonedEdge.fromNode = fromNode
+      clonedEdge.toNode = toNode
+
+      const command = new CreateEdgeCommand(clonedEdge, this.edges)
+      this.commandManager.execute(command)
+    })
+
+    this.updateEdges()
+    this.renderer.markDirty()
   }
 
   // 销毁
