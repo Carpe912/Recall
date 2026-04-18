@@ -77,18 +77,18 @@ export class ContextMenu {
       this.element.appendChild(menuItem)
     })
 
+    // 先用 visibility:hidden 显示以获取实际尺寸，避免闪烁到旧位置
+    this.element.style.visibility = 'hidden'
+    this.element.style.display = 'block'
+    const menuWidth = this.element.offsetWidth
+    const menuHeight = this.element.offsetHeight
+
     // 调整位置，确保不超出视口
-    const rect = this.element.getBoundingClientRect()
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
 
     let finalX = x
     let finalY = y
-
-    // 先显示以获取实际尺寸
-    this.element.style.display = 'block'
-    const menuWidth = this.element.offsetWidth
-    const menuHeight = this.element.offsetHeight
 
     if (x + menuWidth > viewportWidth) {
       finalX = viewportWidth - menuWidth - 10
@@ -100,6 +100,7 @@ export class ContextMenu {
 
     this.element.style.left = `${finalX}px`
     this.element.style.top = `${finalY}px`
+    this.element.style.visibility = 'visible'
 
     this.isVisible = true
   }
