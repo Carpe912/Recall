@@ -851,13 +851,23 @@ export class GraphiteEditor extends EventEmitter {
 
   // 更新所有边的路径
   private updateEdges(): void {
+    console.log('updateEdges called, edges count:', this.edges.length)
     this.edges.forEach(edge => {
       // 确保边的节点引用是最新的
       if (!edge.fromNode || !edge.toNode) {
+        console.log('Edge missing node reference, re-finding:', edge.id)
         edge.fromNode = this.nodes.find(n => n.id === edge.fromNodeId) || null
         edge.toNode = this.nodes.find(n => n.id === edge.toNodeId) || null
       }
-      edge.updatePath(this.edges, this.nodes)
+
+      // 强制更新路径
+      if (edge.fromNode && edge.toNode) {
+        console.log('Updating edge path:', edge.id, 'from:', edge.fromNode.getCenter(), 'to:', edge.toNode.getCenter())
+        edge.updatePath(this.edges, this.nodes)
+        console.log('Edge points after update:', edge.points)
+      } else {
+        console.warn('Edge missing nodes after re-find:', edge.id)
+      }
     })
   }
 
@@ -1416,6 +1426,12 @@ export class GraphiteEditor extends EventEmitter {
     selectedNodes.forEach(node => {
       node.setPosition(minX + node.width / 2, node.transform.y)
     })
+
+    console.log('alignLeft: updating edges, total edges:', this.edges.length)
+    this.edges.forEach(edge => {
+      console.log('Edge:', edge.id, 'fromNode:', edge.fromNode?.id, 'toNode:', edge.toNode?.id)
+    })
+
     this.updateEdges()
     this.renderer.markDirty()
   }
