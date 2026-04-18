@@ -5,6 +5,7 @@ import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
 import { CommandManager } from './interaction/CommandManager'
 import { ContextMenu } from './ui/ContextMenu'
+import { Minimap } from './ui/Minimap'
 import { SnapGuide } from './utils/SnapGuide'
 import {
   MoveCommand,
@@ -26,6 +27,7 @@ export class GraphiteEditor extends EventEmitter {
   private commandManager: CommandManager
   private contextMenu: ContextMenu
   private snapGuide: SnapGuide
+  private minimap: Minimap
 
   // 交互状态
   private isSpacePressed: boolean = false
@@ -70,9 +72,19 @@ export class GraphiteEditor extends EventEmitter {
     this.commandManager = new CommandManager()
     this.contextMenu = new ContextMenu()
     this.snapGuide = new SnapGuide()
+    this.minimap = new Minimap(canvas)
 
     this.setupEventListeners()
     this.startRenderLoop()
+
+    // 监听小地图点击事件
+    this.minimap.getCanvas().addEventListener('minimapClick', ((e: CustomEvent) => {
+      const { x, y } = e.detail
+      const camera = this.renderer.getCamera()
+      camera.x = -x * camera.zoom
+      camera.y = -y * camera.zoom
+      this.renderer.markDirty()
+    }) as EventListener)
   }
 
   // 设置事件监听
@@ -611,6 +623,15 @@ export class GraphiteEditor extends EventEmitter {
     if (this.snapGuides.x.length > 0 || this.snapGuides.y.length > 0) {
       this.drawSnapGuides()
     }
+
+    // 更新小地图
+    this.minimap.render(
+      this.nodes,
+      this.edges,
+      this.renderer.getCamera(),
+      this.canvas.width,
+      this.canvas.height
+    )
   }
 
   // 绘制吸附辅助线
@@ -1008,6 +1029,7 @@ export class GraphiteEditor extends EventEmitter {
   destroy(): void {
     this.renderer.destroy()
     this.contextMenu.destroy()
+    this.minimap.destroy()
     this.clear()
   }
 }
