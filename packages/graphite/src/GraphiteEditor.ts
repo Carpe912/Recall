@@ -811,7 +811,7 @@ export class GraphiteEditor extends EventEmitter {
   // 更新所有边的路径
   private updateEdges(): void {
     this.edges.forEach(edge => {
-      edge.updatePath(this.edges)
+      edge.updatePath(this.edges, this.nodes)
     })
   }
 

@@ -68,6 +68,17 @@
           <option value="curved">曲线</option>
           <option value="orthogonal">折线</option>
         </select>
+        <button class="icon-btn" @click="toggleSmartRouting" :class="{ active: useSmartRouting }">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+            <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+            <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <div class="btn-tip">智能路由（连线避开节点）</div>
+        </button>
 
         <div class="toolbar-sep"></div>
 
@@ -283,6 +294,7 @@ const layoutType = ref<'hierarchical' | 'tree' | 'force' | 'circular' | 'grid'>(
 const nodeShape = ref<'rectangle' | 'circle' | 'diamond' | 'triangle'>('rectangle')
 const edgeLineStyle = ref<'straight' | 'curved' | 'orthogonal'>('straight')
 const theme = ref<'light' | 'dark'>('light')
+const useSmartRouting = ref(false)
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -355,7 +367,10 @@ function addEdge() {
   editor.createEdge({
     from: selectedNodes.value[0],
     to: selectedNodes.value[1],
-    style: { lineStyle: edgeLineStyle.value }
+    style: {
+      lineStyle: edgeLineStyle.value,
+      useSmartRouting: useSmartRouting.value
+    }
   })
 }
 
@@ -363,6 +378,18 @@ function undo() { editor?.undo() }
 function redo() { editor?.redo() }
 function autoLayout() { editor?.autoLayout({ type: layoutType.value }) }
 function clear() { editor?.clear() }
+
+function toggleSmartRouting() {
+  useSmartRouting.value = !useSmartRouting.value
+  // 更新所有现有的折线边
+  if (!editor) return
+  const edges = editor.getEdges()
+  edges.forEach((edge: any) => {
+    if (edge.style.lineStyle === 'orthogonal') {
+      editor!.updateEdgeStyle(edge.id, { useSmartRouting: useSmartRouting.value })
+    }
+  })
+}
 
 // 对齐工具
 function alignLeft() { editor?.alignLeft() }
@@ -634,6 +661,11 @@ function ungroupSelected() { editor?.ungroupSelected() }
 
 .icon-btn:hover .btn-tip {
   opacity: 1;
+}
+
+.icon-btn.active {
+  background: #e3f2fd;
+  color: #1976d2;
 }
 
 .btn-tip kbd {

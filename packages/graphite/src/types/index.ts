@@ -61,6 +61,7 @@ export interface EdgeStyle {
   arrowSize?: number
   opacity?: number
   lineStyle?: 'straight' | 'curved' | 'orthogonal'
+  useSmartRouting?: boolean
 }
 
 export interface PortData {

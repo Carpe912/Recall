@@ -2,6 +2,7 @@ import { GraphicObject } from './GraphicObject'
 import type { EdgeData, EdgeStyle, Rect, Point } from '../types'
 import type { Node } from './Node'
 import { pointToLineDistance, drawArrow } from '../utils/geometry'
+import { PathfindingRouter } from '../utils/PathfindingRouter'
 
 export class Edge extends GraphicObject {
   fromNodeId: string
@@ -25,6 +26,7 @@ export class Edge extends GraphicObject {
       arrowSize: data.style?.arrowSize || 10,
       opacity: data.style?.opacity || 1,
       lineStyle: data.style?.lineStyle || 'straight',
+      useSmartRouting: data.style?.useSmartRouting || false,
     }
   }
 
@@ -189,7 +191,7 @@ export class Edge extends GraphicObject {
   }
 
   // 更新路径
-  updatePath(allEdges: Edge[] = []): void {
+  updatePath(allEdges: Edge[] = [], allNodes: Node[] = []): void {
     if (!this.fromNode || !this.toNode) return
 
     const startCenter = this.fromNode.getCenter()
@@ -263,8 +265,19 @@ export class Edge extends GraphicObject {
     const lineStyle = this.style.lineStyle || 'straight'
 
     if (lineStyle === 'orthogonal') {
-      // 正交线：生成直角路径
-      this.points = this.calculateOrthogonalPath(start, end)
+      // 正交线：检查是否使用智能路由
+      if (this.style.useSmartRouting) {
+        // 使用 A* 算法避开节点
+        const router = new PathfindingRouter()
+        // 过滤掉起点和终点节点
+        const obstacleNodes = allNodes.filter(
+          node => node.id !== this.fromNodeId && node.id !== this.toNodeId
+        )
+        this.points = router.findPath(start, end, obstacleNodes)
+      } else {
+        // 简单的正交路径
+        this.points = this.calculateOrthogonalPath(start, end)
+      }
     } else {
       // 直线或曲线：两点
       this.points = [start, end]
