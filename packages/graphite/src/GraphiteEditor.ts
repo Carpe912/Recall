@@ -852,6 +852,11 @@ export class GraphiteEditor extends EventEmitter {
   // 更新所有边的路径
   private updateEdges(): void {
     this.edges.forEach(edge => {
+      // 确保边的节点引用是最新的
+      if (!edge.fromNode || !edge.toNode) {
+        edge.fromNode = this.nodes.find(n => n.id === edge.fromNodeId) || null
+        edge.toNode = this.nodes.find(n => n.id === edge.toNodeId) || null
+      }
       edge.updatePath(this.edges, this.nodes)
     })
   }
