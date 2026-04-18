@@ -17,6 +17,7 @@ import {
 } from './interaction/Commands'
 import { EventEmitter } from './utils/EventEmitter'
 import { LayoutEngine } from './utils/LayoutEngine'
+import { ThemeManager, themes, type Theme } from './utils/ThemeManager'
 import type { NodeData, EdgeData, Point, NodeStyle, EdgeStyle } from './types'
 import type { LayoutOptions } from './utils/LayoutEngine'
 
@@ -32,6 +33,7 @@ export class GraphiteEditor extends EventEmitter {
   private contextMenu: ContextMenu
   private snapGuide: SnapGuide
   private minimap: Minimap
+  private themeManager: ThemeManager
 
   // 交互状态
   private isSpacePressed: boolean = false
@@ -88,6 +90,10 @@ export class GraphiteEditor extends EventEmitter {
     this.contextMenu = new ContextMenu()
     this.snapGuide = new SnapGuide()
     this.minimap = new Minimap(canvas)
+    this.themeManager = new ThemeManager(ThemeManager.loadTheme())
+
+    // 应用初始主题
+    this.renderer.setThemeColors(this.themeManager.getColors())
 
     this.boundOnMouseMove = this.onMouseMove.bind(this)
     this.boundOnMouseUp = this.onMouseUp.bind(this)
@@ -1309,6 +1315,18 @@ export class GraphiteEditor extends EventEmitter {
     })
     this.updateEdges()
     this.renderer.markDirty()
+  }
+
+  // 主题切换
+  setTheme(theme: Theme): void {
+    this.themeManager.setTheme(theme)
+    this.renderer.setThemeColors(this.themeManager.getColors())
+    ThemeManager.saveTheme(theme)
+    this.emit('themeChanged', theme)
+  }
+
+  getTheme(): Theme {
+    return this.themeManager.getTheme()
   }
 
   // 销毁

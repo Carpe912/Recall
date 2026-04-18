@@ -235,6 +235,27 @@
 
         <div class="toolbar-sep"></div>
 
+        <!-- 主题切换 -->
+        <button class="icon-btn" @click="toggleTheme">
+          <svg v-if="theme === 'light'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <div class="btn-tip">{{ theme === 'light' ? '切换到深色模式' : '切换到浅色模式' }}</div>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
         <!-- 清空 -->
         <button class="icon-btn danger" @click="clear">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -261,6 +282,7 @@ const selectedNodes = ref<string[]>([])
 const layoutType = ref<'hierarchical' | 'tree' | 'force' | 'circular' | 'grid'>('hierarchical')
 const nodeShape = ref<'rectangle' | 'circle' | 'diamond' | 'triangle'>('rectangle')
 const edgeLineStyle = ref<'straight' | 'curved' | 'orthogonal'>('straight')
+const theme = ref<'light' | 'dark'>('light')
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -275,6 +297,9 @@ onMounted(() => {
   if (!canvasRef.value) return
 
   editor = new GraphiteEditor(canvasRef.value)
+
+  // 初始化主题
+  theme.value = editor.getTheme()
 
   editor.on('selectionChanged', (selection: string[]) => {
     selectedNodes.value = selection
@@ -348,6 +373,13 @@ function alignCenterVertical() { editor?.alignCenterVertical() }
 function alignBottom() { editor?.alignBottom() }
 function distributeHorizontally() { editor?.distributeHorizontally() }
 function distributeVertically() { editor?.distributeVertically() }
+
+function toggleTheme() {
+  if (!editor) return
+  const newTheme = theme.value === 'light' ? 'dark' : 'light'
+  editor.setTheme(newTheme)
+  theme.value = newTheme
+}
 
 function updateSelectedNodesStyle() {
   if (!editor || selectedNodes.value.length === 0) return

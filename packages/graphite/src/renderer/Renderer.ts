@@ -2,6 +2,7 @@ import type { Node } from '../core/Node'
 import type { Edge } from '../core/Edge'
 import { Camera } from './Camera'
 import { DirtyRectManager } from './DirtyRectManager'
+import type { ThemeColors } from '../utils/ThemeManager'
 
 export class Renderer {
   private canvas: HTMLCanvasElement
@@ -11,6 +12,14 @@ export class Renderer {
   private animationFrameId: number | null = null
   private needsRender: boolean = true
   private resizeObserver: ResizeObserver
+  private themeColors: ThemeColors = {
+    background: '#ffffff',
+    grid: '#f0f0f0',
+    text: '#333333',
+    nodeFill: '#ffffff',
+    nodeStroke: '#333333',
+    edgeStroke: '#666666',
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -58,8 +67,9 @@ export class Renderer {
 
     this.ctx.save()
 
-    // 清除画布
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    // 清除画布并填充背景色
+    this.ctx.fillStyle = this.themeColors.background
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 
     // 绘制背景
     this.drawBackground()
@@ -91,7 +101,7 @@ export class Renderer {
   // 绘制背景（网格）
   private drawBackground(): void {
     const gridSize = 20
-    const gridColor = '#f0f0f0'
+    const gridColor = this.themeColors.grid
 
     this.ctx.save()
 
@@ -157,6 +167,17 @@ export class Renderer {
   // 获取上下文
   getContext(): CanvasRenderingContext2D {
     return this.ctx
+  }
+
+  // 设置主题颜色
+  setThemeColors(colors: ThemeColors): void {
+    this.themeColors = colors
+    this.markDirty()
+  }
+
+  // 获取主题颜色
+  getThemeColors(): ThemeColors {
+    return this.themeColors
   }
 
   // 销毁
