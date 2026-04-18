@@ -4,6 +4,7 @@ import { Renderer } from './renderer/Renderer'
 import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
 import { CommandManager } from './interaction/CommandManager'
+import { ContextMenu } from './ui/ContextMenu'
 import {
   MoveCommand,
   CreateNodeCommand,
@@ -22,6 +23,7 @@ export class GraphiteEditor extends EventEmitter {
   private selectionManager: SelectionManager
   private dragManager: DragManager
   private commandManager: CommandManager
+  private contextMenu: ContextMenu
 
   // 交互状态
   private isSpacePressed: boolean = false
@@ -61,6 +63,7 @@ export class GraphiteEditor extends EventEmitter {
     this.selectionManager = new SelectionManager()
     this.dragManager = new DragManager()
     this.commandManager = new CommandManager()
+    this.contextMenu = new ContextMenu()
 
     this.setupEventListeners()
     this.startRenderLoop()
@@ -73,6 +76,7 @@ export class GraphiteEditor extends EventEmitter {
     this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this))
     this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this))
     this.canvas.addEventListener('wheel', this.onWheel.bind(this))
+    this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this))
 
     // 键盘事件
     window.addEventListener('keydown', this.onKeyDown.bind(this))
@@ -345,6 +349,52 @@ export class GraphiteEditor extends EventEmitter {
 
     this.renderer.getCamera().scale(delta, point.x, point.y)
     this.renderer.markDirty()
+  }
+
+  // 右键菜单
+  private onContextMenu(e: MouseEvent): void {
+    e.preventDefault()
+
+    const point = this.getMousePosition(e)
+    const worldPoint = this.renderer.getCamera().screenToWorld(point)
+
+    // 检查是否点击了节点
+    const clickedNode = this.findNodeAt(worldPoint)
+
+    const hasSelection = this.selectionManager.hasSelection()
+
+    const menuItems = []
+
+    if (clickedNode) {
+      // 如果点击的节点未被选中，先选中它
+      if (!this.selectionManager.isNodeSelected(clickedNode)) {
+        this.selectionManager.selectNode(clickedNode, false)
+      }
+
+      menuItems.push(
+        { label: '复制', action: () => this.copy() },
+        { label: '剪切', action: () => this.cut() },
+        { label: '删除', action: () => this.deleteSelected() },
+        { divider: true as const },
+        { label: '置于顶层', action: () => this.bringToFront() },
+        { label: '置于底层', action: () => this.sendToBack() }
+      )
+    } else if (hasSelection) {
+      menuItems.push(
+        { label: '复制', action: () => this.copy() },
+        { label: '剪切', action: () => this.cut() },
+        { label: '删除', action: () => this.deleteSelected() }
+      )
+    } else {
+      menuItems.push(
+        { label: '粘贴', action: () => this.paste(), disabled: this.clipboard.nodes.length === 0 },
+        { label: '全选', action: () => this.selectAll() },
+        { divider: true as const },
+        { label: '自动布局', action: () => this.autoLayout() }
+      )
+    }
+
+    this.contextMenu.show(e.clientX, e.clientY, menuItems)
   }
 
   // 键盘按下
@@ -855,9 +905,43 @@ export class GraphiteEditor extends EventEmitter {
     this.renderer.markDirty()
   }
 
+  // 全选
+  selectAll(): void {
+    this.nodes.forEach(node => {
+      this.selectionManager.selectNode(node, true)
+    })
+  }
+
+  // 置于顶层
+  bringToFront(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    selectedNodes.forEach(node => {
+      const index = this.nodes.indexOf(node)
+      if (index !== -1) {
+        this.nodes.splice(index, 1)
+        this.nodes.push(node)
+      }
+    })
+    this.renderer.markDirty()
+  }
+
+  // 置于底层
+  sendToBack(): void {
+    const selectedNodes = this.selectionManager.getSelectedNodes()
+    selectedNodes.forEach(node => {
+      const index = this.nodes.indexOf(node)
+      if (index !== -1) {
+        this.nodes.splice(index, 1)
+        this.nodes.unshift(node)
+      }
+    })
+    this.renderer.markDirty()
+  }
+
   // 销毁
   destroy(): void {
     this.renderer.destroy()
+    this.contextMenu.destroy()
     this.clear()
   }
 }
