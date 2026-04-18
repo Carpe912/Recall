@@ -1,6 +1,7 @@
 import { Node } from './core/Node'
 import { Edge } from './core/Edge'
 import { Group } from './core/Group'
+import { ImageNode } from './core/ImageNode'
 import { Renderer } from './renderer/Renderer'
 import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
@@ -79,6 +80,8 @@ export class GraphiteEditor extends EventEmitter {
   private boundOnMouseUp: (e: MouseEvent) => void
   private boundOnKeyDown: (e: KeyboardEvent) => void
   private boundOnKeyUp: (e: KeyboardEvent) => void
+  private boundOnDrop: (e: DragEvent) => void
+  private boundOnDragOver: (e: DragEvent) => void
 
   constructor(canvas: HTMLCanvasElement) {
     super()
@@ -99,6 +102,8 @@ export class GraphiteEditor extends EventEmitter {
     this.boundOnMouseUp = this.onMouseUp.bind(this)
     this.boundOnKeyDown = this.onKeyDown.bind(this)
     this.boundOnKeyUp = this.onKeyUp.bind(this)
+    this.boundOnDrop = this.onDrop.bind(this)
+    this.boundOnDragOver = this.onDragOver.bind(this)
 
     this.setupEventListeners()
     this.startRenderLoop()
@@ -128,6 +133,10 @@ export class GraphiteEditor extends EventEmitter {
     // 键盘事件
     window.addEventListener('keydown', this.boundOnKeyDown)
     window.addEventListener('keyup', this.boundOnKeyUp)
+
+    // 拖放事件（图片）
+    this.canvas.addEventListener('drop', this.boundOnDrop)
+    this.canvas.addEventListener('dragover', this.boundOnDragOver)
 
     // 选择变化事件
     this.selectionManager.on('selectionChanged', (nodeIds: string[]) => {
@@ -630,6 +639,71 @@ export class GraphiteEditor extends EventEmitter {
     }
   }
 
+  // 拖放事件（图片）
+  private onDragOver(e: DragEvent): void {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
+  private onDrop(e: DragEvent): void {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!e.dataTransfer) return
+
+    const files = Array.from(e.dataTransfer.files)
+    const imageFiles = files.filter(file => file.type.startsWith('image/'))
+
+    if (imageFiles.length === 0) return
+
+    // 获取拖放位置
+    const point = this.getMousePosition(e)
+    const worldPoint = this.renderer.getCamera().screenToWorld(point)
+
+    // 处理每个图片文件
+    imageFiles.forEach((file, index) => {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        if (!event.target?.result) return
+
+        const imageData = event.target.result as string
+
+        // 创建临时图片以获取尺寸
+        const img = new Image()
+        img.onload = () => {
+          // 计算合适的尺寸（最大 300px）
+          const maxSize = 300
+          let width = img.width
+          let height = img.height
+
+          if (width > maxSize || height > maxSize) {
+            const ratio = Math.min(maxSize / width, maxSize / height)
+            width = width * ratio
+            height = height * ratio
+          }
+
+          // 创建图片节点，多个图片时错开位置
+          const offsetX = index * 20
+          const offsetY = index * 20
+
+          this.createImageNode({
+            x: worldPoint.x + offsetX,
+            y: worldPoint.y + offsetY,
+            width,
+            height,
+            content: file.name,
+            imageData,
+          })
+        }
+        img.src = imageData
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
   // 获取鼠标位置
   private getMousePosition(e: MouseEvent): Point {
     const rect = this.canvas.getBoundingClientRect()
@@ -943,6 +1017,22 @@ export class GraphiteEditor extends EventEmitter {
     this.commandManager.execute(command)
     this.renderer.markDirty()
     return node
+  }
+
+  // 创建图片节点
+  createImageNode(data: { x: number; y: number; width: number; height: number; content: string; imageData: string }): ImageNode {
+    const imageNode = new ImageNode({
+      x: data.x,
+      y: data.y,
+      width: data.width,
+      height: data.height,
+      content: data.content,
+      imageData: data.imageData,
+    })
+    const command = new CreateNodeCommand(imageNode, this.nodes)
+    this.commandManager.execute(command)
+    this.renderer.markDirty()
+    return imageNode
   }
 
   // 创建边
@@ -1348,6 +1438,8 @@ export class GraphiteEditor extends EventEmitter {
   destroy(): void {
     this.canvas.removeEventListener('mousemove', this.boundOnMouseMove)
     this.canvas.removeEventListener('mouseup', this.boundOnMouseUp)
+    this.canvas.removeEventListener('drop', this.boundOnDrop)
+    this.canvas.removeEventListener('dragover', this.boundOnDragOver)
     window.removeEventListener('mouseup', this.boundOnMouseUp)
     window.removeEventListener('keydown', this.boundOnKeyDown)
     window.removeEventListener('keyup', this.boundOnKeyUp)
@@ -1360,15 +1452,22 @@ export class GraphiteEditor extends EventEmitter {
   // 导出为 JSON
   exportToJSON(): string {
     const data = {
-      nodes: this.nodes.map(node => ({
-        id: node.id,
-        x: node.transform.x,
-        y: node.transform.y,
-        width: node.width,
-        height: node.height,
-        content: node.content,
-        style: node.style,
-      })),
+      nodes: this.nodes.map(node => {
+        const baseData: any = {
+          id: node.id,
+          x: node.transform.x,
+          y: node.transform.y,
+          width: node.width,
+          height: node.height,
+          content: node.content,
+          style: node.style,
+        }
+        // 如果是图片节点，添加 imageData
+        if (node instanceof ImageNode) {
+          baseData.imageData = node.imageData
+        }
+        return baseData
+      }),
       edges: this.edges.map(edge => ({
         id: edge.id,
         from: edge.fromNodeId,
@@ -1390,7 +1489,14 @@ export class GraphiteEditor extends EventEmitter {
       // 导入节点
       const nodeMap = new Map<string, Node>()
       data.nodes?.forEach((nodeData: any) => {
-        const node = this.createNode(nodeData)
+        let node: Node
+        if (nodeData.imageData) {
+          // 创建图片节点
+          node = this.createImageNode(nodeData)
+        } else {
+          // 创建普通节点
+          node = this.createNode(nodeData)
+        }
         nodeMap.set(nodeData.id, node)
       })
 
