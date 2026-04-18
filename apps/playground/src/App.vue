@@ -63,6 +63,11 @@
           </svg>
           <div class="btn-tip">添加连线（先选中 2 个节点）</div>
         </button>
+        <select v-model="edgeLineStyle" class="shape-select" title="连线样式">
+          <option value="straight">直线</option>
+          <option value="curved">曲线</option>
+          <option value="orthogonal">折线</option>
+        </select>
 
         <div class="toolbar-sep"></div>
 
@@ -187,6 +192,7 @@ let editor: GraphiteEditor | null = null
 const selectedNodes = ref<string[]>([])
 const layoutType = ref<'hierarchical' | 'tree' | 'force' | 'circular' | 'grid'>('hierarchical')
 const nodeShape = ref<'rectangle' | 'circle' | 'diamond' | 'triangle'>('rectangle')
+const edgeLineStyle = ref<'straight' | 'curved' | 'orthogonal'>('straight')
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -253,7 +259,11 @@ function addNode() {
 
 function addEdge() {
   if (!editor || selectedNodes.value.length !== 2) return
-  editor.createEdge({ from: selectedNodes.value[0], to: selectedNodes.value[1] })
+  editor.createEdge({
+    from: selectedNodes.value[0],
+    to: selectedNodes.value[1],
+    style: { lineStyle: edgeLineStyle.value }
+  })
 }
 
 function undo() { editor?.undo() }

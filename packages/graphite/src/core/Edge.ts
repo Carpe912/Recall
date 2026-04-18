@@ -24,6 +24,7 @@ export class Edge extends GraphicObject {
       arrowType: data.style?.arrowType || 'arrow',
       arrowSize: data.style?.arrowSize || 10,
       opacity: data.style?.opacity || 1,
+      lineStyle: data.style?.lineStyle || 'straight',
     }
   }
 
@@ -43,12 +44,39 @@ export class Edge extends GraphicObject {
       ctx.setLineDash(dashArray)
     }
 
-    // 绘制路径
+    // 根据线条样式绘制路径
     ctx.beginPath()
-    ctx.moveTo(this.points[0].x, this.points[0].y)
 
-    for (let i = 1; i < this.points.length; i++) {
-      ctx.lineTo(this.points[i].x, this.points[i].y)
+    const lineStyle = this.style.lineStyle || 'straight'
+
+    if (lineStyle === 'curved' && this.points.length === 2) {
+      // 曲线：使用贝塞尔曲线
+      const start = this.points[0]
+      const end = this.points[1]
+      const dx = end.x - start.x
+      const dy = end.y - start.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      // 控制点偏移量（垂直于连线方向）
+      const offset = distance * 0.2
+      const midX = (start.x + end.x) / 2
+      const midY = (start.y + end.y) / 2
+
+      // 垂直方向
+      const perpX = -dy / distance
+      const perpY = dx / distance
+
+      const cp1X = midX + perpX * offset
+      const cp1Y = midY + perpY * offset
+
+      ctx.moveTo(start.x, start.y)
+      ctx.quadraticCurveTo(cp1X, cp1Y, end.x, end.y)
+    } else {
+      // 直线或正交线：直接连接点
+      ctx.moveTo(this.points[0].x, this.points[0].y)
+      for (let i = 1; i < this.points.length; i++) {
+        ctx.lineTo(this.points[i].x, this.points[i].y)
+      }
     }
 
     ctx.stroke()
@@ -231,6 +259,39 @@ export class Edge extends GraphicObject {
       end.y += perpY * offset
     }
 
-    this.points = [start, end]
+    // 根据线条样式生成路径点
+    const lineStyle = this.style.lineStyle || 'straight'
+
+    if (lineStyle === 'orthogonal') {
+      // 正交线：生成直角路径
+      this.points = this.calculateOrthogonalPath(start, end)
+    } else {
+      // 直线或曲线：两点
+      this.points = [start, end]
+    }
+  }
+
+  // 计算正交路径（直角折线）
+  private calculateOrthogonalPath(start: Point, end: Point): Point[] {
+    const points: Point[] = [start]
+
+    // 简单的正交路径：先水平后垂直，或先垂直后水平
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+
+    // 如果水平距离更大，先水平移动
+    if (Math.abs(dx) > Math.abs(dy)) {
+      const midX = start.x + dx / 2
+      points.push({ x: midX, y: start.y })
+      points.push({ x: midX, y: end.y })
+    } else {
+      // 否则先垂直移动
+      const midY = start.y + dy / 2
+      points.push({ x: start.x, y: midY })
+      points.push({ x: end.x, y: midY })
+    }
+
+    points.push(end)
+    return points
   }
 }

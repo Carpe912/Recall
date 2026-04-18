@@ -60,6 +60,7 @@ export interface EdgeStyle {
   arrowType?: 'arrow' | 'circle' | 'diamond' | 'none'
   arrowSize?: number
   opacity?: number
+  lineStyle?: 'straight' | 'curved' | 'orthogonal'
 }
 
 export interface PortData {
