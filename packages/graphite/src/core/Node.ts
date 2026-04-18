@@ -349,6 +349,31 @@ export class Node extends GraphicObject {
     }
   }
 
+  // 获取最近的连接点
+  getClosestPort(point: Point): { position: 'top' | 'right' | 'bottom' | 'left', point: Point } {
+    const ports: Array<{ position: 'top' | 'right' | 'bottom' | 'left', point: Point }> = [
+      { position: 'top', point: this.getPortPosition('top') },
+      { position: 'right', point: this.getPortPosition('right') },
+      { position: 'bottom', point: this.getPortPosition('bottom') },
+      { position: 'left', point: this.getPortPosition('left') },
+    ]
+
+    let closest = ports[0]
+    let minDistance = Infinity
+
+    ports.forEach(port => {
+      const dx = point.x - port.point.x
+      const dy = point.y - port.point.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      if (distance < minDistance) {
+        minDistance = distance
+        closest = port
+      }
+    })
+
+    return closest
+  }
+
   // 检测点击的是哪个连接点
   hitTestPort(x: number, y: number): 'top' | 'right' | 'bottom' | 'left' | null {
     const portRadius = 8 // 稍微大一点，方便点击

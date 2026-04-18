@@ -252,14 +252,29 @@ export class GraphiteEditor extends EventEmitter {
 
     // 创建连线
     if (this.isCreatingEdge) {
-      this.edgePreviewEnd = worldPoint
-
       // 检测是否悬浮在目标节点上
       const targetNode = this.findNodeAt(worldPoint)
       if (targetNode && targetNode !== this.edgeStartNode) {
         this.edgeTargetNode = targetNode
+
+        // 磁性吸附：找到最近的连接点
+        const closestPort = targetNode.getClosestPort(worldPoint)
+        const snapThreshold = 30 / this.renderer.getCamera().zoom
+
+        // 计算到最近连接点的距离
+        const dx = worldPoint.x - closestPort.point.x
+        const dy = worldPoint.y - closestPort.point.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        // 如果在吸附范围内，吸附到连接点
+        if (distance < snapThreshold) {
+          this.edgePreviewEnd = closestPort.point
+        } else {
+          this.edgePreviewEnd = worldPoint
+        }
       } else {
         this.edgeTargetNode = null
+        this.edgePreviewEnd = worldPoint
       }
 
       this.renderer.markDirty()
