@@ -7,14 +7,14 @@
         <button @click="addEdge" :disabled="selectedNodes.length !== 2">Add Edge</button>
         <button @click="undo">Undo</button>
         <button @click="redo">Redo</button>
-        <button @click="autoLayout">Auto Layout</button>
-        <select v-model="layoutType" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+        <select v-model="layoutType" @change="autoLayout" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
           <option value="hierarchical">层次布局</option>
           <option value="tree">树形布局</option>
           <option value="force">力导向布局</option>
           <option value="circular">环形布局</option>
           <option value="grid">网格布局</option>
         </select>
+        <button @click="autoLayout">自动布局</button>
         <button @click="groupSelected" :disabled="selectedNodes.length < 2">Group</button>
         <button @click="ungroupSelected" :disabled="selectedNodes.length === 0">Ungroup</button>
         <button @click="clear">Clear</button>
