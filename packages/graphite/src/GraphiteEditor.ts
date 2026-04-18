@@ -67,6 +67,12 @@ export class GraphiteEditor extends EventEmitter {
     edges: Edge[]
   } = { nodes: [], edges: [] }
 
+  // 保存绑定后的函数引用，用于注销事件
+  private boundOnMouseMove: (e: MouseEvent) => void
+  private boundOnMouseUp: (e: MouseEvent) => void
+  private boundOnKeyDown: (e: KeyboardEvent) => void
+  private boundOnKeyUp: (e: KeyboardEvent) => void
+
   constructor(canvas: HTMLCanvasElement) {
     super()
     this.canvas = canvas
@@ -77,6 +83,11 @@ export class GraphiteEditor extends EventEmitter {
     this.contextMenu = new ContextMenu()
     this.snapGuide = new SnapGuide()
     this.minimap = new Minimap(canvas)
+
+    this.boundOnMouseMove = this.onMouseMove.bind(this)
+    this.boundOnMouseUp = this.onMouseUp.bind(this)
+    this.boundOnKeyDown = this.onKeyDown.bind(this)
+    this.boundOnKeyUp = this.onKeyUp.bind(this)
 
     this.setupEventListeners()
     this.startRenderLoop()
@@ -93,16 +104,17 @@ export class GraphiteEditor extends EventEmitter {
 
   // 设置事件监听
   private setupEventListeners(): void {
-    // 鼠标事件
+    // mousedown 只在 canvas 上监听（只有在 canvas 内按下才触发交互）
     this.canvas.addEventListener('mousedown', this.onMouseDown.bind(this))
-    this.canvas.addEventListener('mousemove', this.onMouseMove.bind(this))
-    this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this))
+    // mousemove / mouseup 在 window 上监听，防止鼠标移出 canvas 后状态卡死
+    window.addEventListener('mousemove', this.boundOnMouseMove)
+    window.addEventListener('mouseup', this.boundOnMouseUp)
     this.canvas.addEventListener('wheel', this.onWheel.bind(this))
     this.canvas.addEventListener('contextmenu', this.onContextMenu.bind(this))
 
     // 键盘事件
-    window.addEventListener('keydown', this.onKeyDown.bind(this))
-    window.addEventListener('keyup', this.onKeyUp.bind(this))
+    window.addEventListener('keydown', this.boundOnKeyDown)
+    window.addEventListener('keyup', this.boundOnKeyUp)
 
     // 选择变化事件
     this.selectionManager.on('selectionChanged', (nodeIds: string[]) => {
@@ -202,6 +214,7 @@ export class GraphiteEditor extends EventEmitter {
   private onMouseMove(e: MouseEvent): void {
     const point = this.getMousePosition(e)
     const worldPoint = this.renderer.getCamera().screenToWorld(point)
+    const isOverCanvas = this.isPointOverCanvas(e)
 
     // 平移画布
     if (this.isPanning && this.panStartPoint) {
@@ -269,6 +282,13 @@ export class GraphiteEditor extends EventEmitter {
     if (this.selectionBoxStart) {
       this.selectionBoxEnd = worldPoint
       this.renderer.markDirty()
+      return
+    }
+
+    // 以下是纯 hover 效果，只在 canvas 内有效
+    if (!isOverCanvas) {
+      this.hoveredNode = null
+      this.canvas.style.cursor = 'default'
       return
     }
 
@@ -501,6 +521,17 @@ export class GraphiteEditor extends EventEmitter {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     }
+  }
+
+  // 判断鼠标事件是否在 canvas 范围内
+  private isPointOverCanvas(e: MouseEvent): boolean {
+    const rect = this.canvas.getBoundingClientRect()
+    return (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    )
   }
 
   // 查找指定位置的节点
@@ -1076,6 +1107,10 @@ export class GraphiteEditor extends EventEmitter {
 
   // 销毁
   destroy(): void {
+    window.removeEventListener('mousemove', this.boundOnMouseMove)
+    window.removeEventListener('mouseup', this.boundOnMouseUp)
+    window.removeEventListener('keydown', this.boundOnKeyDown)
+    window.removeEventListener('keyup', this.boundOnKeyUp)
     this.renderer.destroy()
     this.contextMenu.destroy()
     this.minimap.destroy()
