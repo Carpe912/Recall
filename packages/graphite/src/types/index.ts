@@ -37,6 +37,11 @@ export interface NodeStyle {
   borderRadius?: number
   fontSize?: number
   fontColor?: string
+  shadowBlur?: number
+  shadowColor?: string
+  shadowOffsetX?: number
+  shadowOffsetY?: number
+  opacity?: number
 }
 
 export interface EdgeData {

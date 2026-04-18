@@ -24,6 +24,11 @@ export class Node extends GraphicObject {
       borderRadius: data.style?.borderRadius || 8,
       fontSize: data.style?.fontSize || 14,
       fontColor: data.style?.fontColor || '#333333',
+      shadowBlur: data.style?.shadowBlur || 0,
+      shadowColor: data.style?.shadowColor || 'rgba(0, 0, 0, 0.2)',
+      shadowOffsetX: data.style?.shadowOffsetX || 0,
+      shadowOffsetY: data.style?.shadowOffsetY || 0,
+      opacity: data.style?.opacity || 1,
     }
   }
 
@@ -36,6 +41,17 @@ export class Node extends GraphicObject {
     ctx.translate(this.transform.x, this.transform.y)
     ctx.rotate(this.transform.rotation)
     ctx.scale(this.transform.scaleX, this.transform.scaleY)
+
+    // 应用透明度
+    ctx.globalAlpha = this.style.opacity
+
+    // 应用阴影
+    if (this.style.shadowBlur > 0) {
+      ctx.shadowBlur = this.style.shadowBlur
+      ctx.shadowColor = this.style.shadowColor
+      ctx.shadowOffsetX = this.style.shadowOffsetX
+      ctx.shadowOffsetY = this.style.shadowOffsetY
+    }
 
     // 绘制矩形（带圆角）
     const x = -this.width / 2

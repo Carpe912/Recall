@@ -11,7 +11,40 @@
         <button @click="clear">Clear</button>
       </div>
     </div>
-    <canvas ref="canvasRef" class="canvas"></canvas>
+    <div class="main-content">
+      <div class="sidebar" v-if="selectedNodes.length > 0">
+        <h3>节点样式</h3>
+        <div class="style-control">
+          <label>填充颜色</label>
+          <input type="color" v-model="nodeStyle.fill" @input="updateSelectedNodesStyle">
+        </div>
+        <div class="style-control">
+          <label>边框颜色</label>
+          <input type="color" v-model="nodeStyle.stroke" @input="updateSelectedNodesStyle">
+        </div>
+        <div class="style-control">
+          <label>边框宽度</label>
+          <input type="range" min="0" max="10" v-model.number="nodeStyle.strokeWidth" @input="updateSelectedNodesStyle">
+          <span>{{ nodeStyle.strokeWidth }}px</span>
+        </div>
+        <div class="style-control">
+          <label>圆角</label>
+          <input type="range" min="0" max="50" v-model.number="nodeStyle.borderRadius" @input="updateSelectedNodesStyle">
+          <span>{{ nodeStyle.borderRadius }}px</span>
+        </div>
+        <div class="style-control">
+          <label>阴影模糊</label>
+          <input type="range" min="0" max="30" v-model.number="nodeStyle.shadowBlur" @input="updateSelectedNodesStyle">
+          <span>{{ nodeStyle.shadowBlur }}px</span>
+        </div>
+        <div class="style-control">
+          <label>透明度</label>
+          <input type="range" min="0" max="1" step="0.1" v-model.number="nodeStyle.opacity" @input="updateSelectedNodesStyle">
+          <span>{{ nodeStyle.opacity }}</span>
+        </div>
+      </div>
+      <canvas ref="canvasRef" class="canvas"></canvas>
+    </div>
   </div>
 </template>
 
@@ -23,6 +56,15 @@ const canvasRef = ref<HTMLCanvasElement>()
 let editor: GraphiteEditor | null = null
 const selectedNodes = ref<string[]>([])
 
+const nodeStyle = ref({
+  fill: '#ffffff',
+  stroke: '#333333',
+  strokeWidth: 2,
+  borderRadius: 8,
+  shadowBlur: 0,
+  opacity: 1,
+})
+
 onMounted(() => {
   if (!canvasRef.value) return
 
@@ -32,6 +74,22 @@ onMounted(() => {
   // Listen to selection changes
   editor.on('selectionChanged', (selection: string[]) => {
     selectedNodes.value = selection
+
+    // 更新样式面板显示当前选中节点的样式
+    if (selection.length > 0) {
+      const nodes = editor!.getNodes()
+      const firstSelected = nodes.find(n => n.id === selection[0])
+      if (firstSelected) {
+        nodeStyle.value = {
+          fill: firstSelected.style.fill,
+          stroke: firstSelected.style.stroke,
+          strokeWidth: firstSelected.style.strokeWidth,
+          borderRadius: firstSelected.style.borderRadius,
+          shadowBlur: firstSelected.style.shadowBlur,
+          opacity: firstSelected.style.opacity,
+        }
+      }
+    }
   })
 
   // Create some initial nodes
@@ -48,7 +106,12 @@ onMounted(() => {
     y: 150,
     width: 120,
     height: 80,
-    content: 'Node 2'
+    content: 'Node 2',
+    style: {
+      fill: '#e3f2fd',
+      stroke: '#1976d2',
+      shadowBlur: 10,
+    }
   })
 
   const node3 = editor.createNode({
@@ -56,7 +119,12 @@ onMounted(() => {
     y: 300,
     width: 120,
     height: 80,
-    content: 'Node 3'
+    content: 'Node 3',
+    style: {
+      fill: '#fff3e0',
+      stroke: '#f57c00',
+      borderRadius: 20,
+    }
   })
 
   // Create edges
@@ -107,6 +175,12 @@ function autoLayout() {
 function clear() {
   editor?.clear()
 }
+
+function updateSelectedNodesStyle() {
+  if (!editor || selectedNodes.value.length === 0) return
+
+  editor.updateNodesStyle(selectedNodes.value, nodeStyle.value)
+}
 </script>
 
 <style scoped>
@@ -156,6 +230,59 @@ function clear() {
 .controls button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 250px;
+  background: #fafafa;
+  border-right: 1px solid #ddd;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.sidebar h3 {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.style-control {
+  margin-bottom: 20px;
+}
+
+.style-control label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.style-control input[type="color"] {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.style-control input[type="range"] {
+  width: calc(100% - 50px);
+  margin-right: 10px;
+}
+
+.style-control span {
+  font-size: 12px;
+  color: #666;
+  min-width: 40px;
+  display: inline-block;
 }
 
 .canvas {

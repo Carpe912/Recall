@@ -12,7 +12,7 @@ import {
   DeleteEdgeCommand,
 } from './interaction/Commands'
 import { EventEmitter } from './utils/EventEmitter'
-import type { NodeData, EdgeData, Point } from './types'
+import type { NodeData, EdgeData, Point, NodeStyle } from './types'
 
 export class GraphiteEditor extends EventEmitter {
   private canvas: HTMLCanvasElement
@@ -35,6 +35,7 @@ export class GraphiteEditor extends EventEmitter {
   private edgeStartNode: Node | null = null
   private edgeStartPort: 'top' | 'right' | 'bottom' | 'left' | null = null
   private edgePreviewEnd: Point | null = null
+  private edgeTargetNode: Node | null = null // 连线目标节点（用于高亮）
 
   // 调整大小状态
   private isResizing: boolean = false
@@ -44,10 +45,8 @@ export class GraphiteEditor extends EventEmitter {
   private resizeStartSize: { width: number; height: number } | null = null
   private resizeStartPosition: Point | null = null
 
-  // 旋转状态
-  private isRotating: boolean = false
-  private rotateNode: Node | null = null
-  private rotateStartAngle: number = 0
+  // 悬浮状态
+  private hoveredNode: Node | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     super()
@@ -113,22 +112,20 @@ export class GraphiteEditor extends EventEmitter {
       const clickedNode = this.findNodeAt(worldPoint)
 
       if (clickedNode) {
-        // 如果节点被选中，检查是否点击了控制点
-        if (this.selectionManager.isNodeSelected(clickedNode)) {
-          // 检查旋转控制点
-          if (clickedNode.hitTestRotateHandle(worldPoint.x, worldPoint.y)) {
-            this.isRotating = true
-            this.rotateNode = clickedNode
-            const center = clickedNode.getCenter()
-            this.rotateStartAngle = Math.atan2(
-              worldPoint.y - center.y,
-              worldPoint.x - center.x
-            ) - clickedNode.transform.rotation
-            this.canvas.style.cursor = 'grab'
-            return
-          }
+        // 检查连接点（任何节点都可以，不需要先选中）
+        const port = clickedNode.hitTestPort(worldPoint.x, worldPoint.y)
+        if (port) {
+          // 点击了连接点，开始创建连线
+          this.isCreatingEdge = true
+          this.edgeStartNode = clickedNode
+          this.edgeStartPort = port
+          this.edgePreviewEnd = worldPoint
+          this.canvas.style.cursor = 'crosshair'
+          return
+        }
 
-          // 检查调整大小控制点
+        // 如果节点被选中，检查是否点击了调整大小控制点
+        if (this.selectionManager.isNodeSelected(clickedNode)) {
           const resizeHandle = clickedNode.hitTestResizeHandle(worldPoint.x, worldPoint.y)
           if (resizeHandle) {
             this.isResizing = true
@@ -144,18 +141,6 @@ export class GraphiteEditor extends EventEmitter {
               y: clickedNode.transform.y,
             }
             this.canvas.style.cursor = this.getResizeCursor(resizeHandle)
-            return
-          }
-
-          // 检查连接点
-          const port = clickedNode.hitTestPort(worldPoint.x, worldPoint.y)
-          if (port) {
-            // 点击了连接点，开始创建连线
-            this.isCreatingEdge = true
-            this.edgeStartNode = clickedNode
-            this.edgeStartPort = port
-            this.edgePreviewEnd = worldPoint
-            this.canvas.style.cursor = 'crosshair'
             return
           }
         }
@@ -196,19 +181,6 @@ export class GraphiteEditor extends EventEmitter {
       return
     }
 
-    // 旋转节点
-    if (this.isRotating && this.rotateNode) {
-      const center = this.rotateNode.getCenter()
-      const currentAngle = Math.atan2(
-        worldPoint.y - center.y,
-        worldPoint.x - center.x
-      )
-      this.rotateNode.setRotation(currentAngle - this.rotateStartAngle)
-      this.updateEdges()
-      this.renderer.markDirty()
-      return
-    }
-
     // 调整大小
     if (this.isResizing && this.resizeNode && this.resizeHandle && this.resizeStartPoint && this.resizeStartSize && this.resizeStartPosition) {
       const dx = worldPoint.x - this.resizeStartPoint.x
@@ -223,6 +195,15 @@ export class GraphiteEditor extends EventEmitter {
     // 创建连线
     if (this.isCreatingEdge) {
       this.edgePreviewEnd = worldPoint
+
+      // 检测是否悬浮在目标节点上
+      const targetNode = this.findNodeAt(worldPoint)
+      if (targetNode && targetNode !== this.edgeStartNode) {
+        this.edgeTargetNode = targetNode
+      } else {
+        this.edgeTargetNode = null
+      }
+
       this.renderer.markDirty()
       return
     }
@@ -240,25 +221,35 @@ export class GraphiteEditor extends EventEmitter {
       return
     }
 
-    // 更新光标
+    // 更新悬浮节点和光标
     const hoveredNode = this.findNodeAt(worldPoint)
-    if (hoveredNode && this.selectionManager.isNodeSelected(hoveredNode)) {
-      if (hoveredNode.hitTestRotateHandle(worldPoint.x, worldPoint.y)) {
-        this.canvas.style.cursor = 'grab'
-      } else {
+    this.hoveredNode = hoveredNode
+
+    if (hoveredNode) {
+      // 检查连接点
+      const port = hoveredNode.hitTestPort(worldPoint.x, worldPoint.y)
+      if (port) {
+        this.canvas.style.cursor = 'crosshair'
+        this.renderer.markDirty() // 重新渲染以显示连接点
+        return
+      }
+
+      // 检查调整大小控制点（仅选中的节点）
+      if (this.selectionManager.isNodeSelected(hoveredNode)) {
         const resizeHandle = hoveredNode.hitTestResizeHandle(worldPoint.x, worldPoint.y)
         if (resizeHandle) {
           this.canvas.style.cursor = this.getResizeCursor(resizeHandle)
-        } else {
-          const port = hoveredNode.hitTestPort(worldPoint.x, worldPoint.y)
-          this.canvas.style.cursor = port ? 'crosshair' : 'move'
+          return
         }
+        this.canvas.style.cursor = 'move'
+      } else {
+        this.canvas.style.cursor = 'pointer'
       }
-    } else if (hoveredNode) {
-      this.canvas.style.cursor = 'pointer'
     } else {
       this.canvas.style.cursor = 'default'
     }
+
+    this.renderer.markDirty()
   }
 
   // 鼠标抬起
@@ -271,15 +262,6 @@ export class GraphiteEditor extends EventEmitter {
       this.isPanning = false
       this.panStartPoint = null
       this.canvas.style.cursor = 'default'
-      return
-    }
-
-    // 结束旋转
-    if (this.isRotating) {
-      this.isRotating = false
-      this.rotateNode = null
-      this.canvas.style.cursor = 'default'
-      this.renderer.markDirty()
       return
     }
 
@@ -301,9 +283,6 @@ export class GraphiteEditor extends EventEmitter {
       const targetNode = this.findNodeAt(worldPoint)
 
       if (targetNode && targetNode !== this.edgeStartNode) {
-        // 检查是否在目标节点的连接点上
-        const targetPort = targetNode.hitTestPort(worldPoint.x, worldPoint.y)
-
         // 创建连线
         try {
           this.createEdge({
@@ -320,6 +299,7 @@ export class GraphiteEditor extends EventEmitter {
       this.edgeStartNode = null
       this.edgeStartPort = null
       this.edgePreviewEnd = null
+      this.edgeTargetNode = null
       this.canvas.style.cursor = 'default'
       this.renderer.markDirty()
       return
@@ -494,7 +474,7 @@ export class GraphiteEditor extends EventEmitter {
   // 更新所有边的路径
   private updateEdges(): void {
     this.edges.forEach(edge => {
-      edge.updatePath()
+      edge.updatePath(this.edges)
     })
   }
 
@@ -507,8 +487,9 @@ export class GraphiteEditor extends EventEmitter {
 
   // 渲染
   private render(): void {
-    const selectedNodeIds = this.selectionManager.getSelectedNodeIds()
-    this.renderer.render(this.nodes, this.edges, selectedNodeIds)
+    // 传递悬浮节点的 ID 来显示连接点
+    const hoveredNodeIds = this.hoveredNode ? [this.hoveredNode.id] : []
+    this.renderer.render(this.nodes, this.edges, hoveredNodeIds)
 
     // 绘制选择框
     if (this.selectionBoxStart && this.selectionBoxEnd) {
@@ -557,6 +538,23 @@ export class GraphiteEditor extends EventEmitter {
     ctx.save()
     camera.applyTransform(ctx)
 
+    // 绘制连线目标节点的高亮（绿色）
+    if (this.edgeTargetNode) {
+      const bounds = this.edgeTargetNode.getBounds()
+      const padding = 6
+
+      ctx.strokeStyle = '#52C41A' // 绿色
+      ctx.lineWidth = 3 / camera.zoom
+      ctx.setLineDash([])
+
+      ctx.strokeRect(
+        bounds.x - padding,
+        bounds.y - padding,
+        bounds.width + padding * 2,
+        bounds.height + padding * 2
+      )
+    }
+
     // 绘制选中的节点
     this.selectionManager.getSelectedNodes().forEach(node => {
       const bounds = node.getBounds()
@@ -577,9 +575,6 @@ export class GraphiteEditor extends EventEmitter {
 
       // 绘制调整大小的控制点
       node.drawResizeHandles(ctx)
-
-      // 绘制旋转控制点
-      node.drawRotateHandle(ctx)
     })
 
     ctx.restore()
@@ -633,10 +628,10 @@ export class GraphiteEditor extends EventEmitter {
 
     edge.fromNode = fromNode
     edge.toNode = toNode
-    edge.updatePath()
 
     const command = new CreateEdgeCommand(edge, this.edges)
     this.commandManager.execute(command)
+    this.updateEdges()
     this.renderer.markDirty()
     return edge
   }
@@ -720,6 +715,20 @@ export class GraphiteEditor extends EventEmitter {
   // 获取所有边
   getEdges(): Edge[] {
     return this.edges
+  }
+
+  // 更新节点样式
+  updateNodeStyle(nodeId: string, style: Partial<NodeStyle>): void {
+    const node = this.nodes.find(n => n.id === nodeId)
+    if (!node) return
+
+    Object.assign(node.style, style)
+    this.renderer.markDirty()
+  }
+
+  // 批量更新节点样式
+  updateNodesStyle(nodeIds: string[], style: Partial<NodeStyle>): void {
+    nodeIds.forEach(id => this.updateNodeStyle(id, style))
   }
 
   // 销毁

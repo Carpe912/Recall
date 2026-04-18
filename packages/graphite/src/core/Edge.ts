@@ -29,14 +29,6 @@ export class Edge extends GraphicObject {
 
     ctx.save()
 
-    // 绘制路径
-    ctx.beginPath()
-    ctx.moveTo(this.points[0].x, this.points[0].y)
-
-    for (let i = 1; i < this.points.length; i++) {
-      ctx.lineTo(this.points[i].x, this.points[i].y)
-    }
-
     ctx.strokeStyle = this.style.stroke
     ctx.lineWidth = this.style.strokeWidth
 
@@ -45,17 +37,43 @@ export class Edge extends GraphicObject {
       ctx.setLineDash(dashArray)
     }
 
+    // 绘制路径（转角处使用圆角）
+    const radius = 8 // 转角圆角半径
+    ctx.beginPath()
+    ctx.moveTo(this.points[0].x, this.points[0].y)
+
+    for (let i = 1; i < this.points.length - 1; i++) {
+      const prev = this.points[i - 1]
+      const curr = this.points[i]
+      const next = this.points[i + 1]
+
+      // 计算圆角的控制点
+      const d1 = Math.sqrt((curr.x - prev.x) ** 2 + (curr.y - prev.y) ** 2)
+      const d2 = Math.sqrt((next.x - curr.x) ** 2 + (next.y - curr.y) ** 2)
+      const r = Math.min(radius, d1 / 2, d2 / 2)
+
+      // 进入转角前的点
+      const t1x = curr.x - (curr.x - prev.x) / d1 * r
+      const t1y = curr.y - (curr.y - prev.y) / d1 * r
+
+      // 离开转角后的点
+      const t2x = curr.x + (next.x - curr.x) / d2 * r
+      const t2y = curr.y + (next.y - curr.y) / d2 * r
+
+      ctx.lineTo(t1x, t1y)
+      ctx.quadraticCurveTo(curr.x, curr.y, t2x, t2y)
+    }
+
+    ctx.lineTo(this.points[this.points.length - 1].x, this.points[this.points.length - 1].y)
+
     ctx.stroke()
     ctx.setLineDash([])
 
     // 绘制箭头
-    if (this.points.length >= 2) {
-      const lastPoint = this.points[this.points.length - 1]
-      const secondLastPoint = this.points[this.points.length - 2]
-
-      ctx.fillStyle = this.style.stroke
-      drawArrow(ctx, secondLastPoint, lastPoint, 10)
-    }
+    const lastPoint = this.points[this.points.length - 1]
+    const secondLastPoint = this.points[this.points.length - 2]
+    ctx.fillStyle = this.style.stroke
+    drawArrow(ctx, secondLastPoint, lastPoint, 10)
 
     ctx.restore()
   }
@@ -117,24 +135,23 @@ export class Edge extends GraphicObject {
   }
 
   // 更新路径
-  updatePath(): void {
+  updatePath(allEdges: Edge[] = []): void {
     if (!this.fromNode || !this.toNode) return
 
     const startCenter = this.fromNode.getCenter()
     const endCenter = this.toNode.getCenter()
 
-    // 计算方向
+    // 计算两节点中心的方向
     const dx = endCenter.x - startCenter.x
     const dy = endCenter.y - startCenter.y
     const distance = Math.sqrt(dx * dx + dy * dy)
 
     if (distance === 0) return
 
-    // 归一化方向向量
     const dirX = dx / distance
     const dirY = dy / distance
 
-    // 计算起点（从节点边缘开始）
+    // 计算起点（从节点真实边缘开始）
     const fromHalfWidth = this.fromNode.width / 2
     const fromHalfHeight = this.fromNode.height / 2
     const fromOffset = Math.min(
@@ -147,7 +164,7 @@ export class Edge extends GraphicObject {
       y: startCenter.y + dirY * fromOffset,
     }
 
-    // 计算终点（到节点边缘结束）
+    // 计算终点（到节点真实边缘结束）
     const toHalfWidth = this.toNode.width / 2
     const toHalfHeight = this.toNode.height / 2
     const toOffset = Math.min(
@@ -156,29 +173,38 @@ export class Edge extends GraphicObject {
     )
 
     const end = {
-      x: endCenter.x - dirX * toOffset,
-      y: endCenter.y - dirY * toOffset,
+      x: endCenter.x - dirX * (toOffset + 5),
+      y: endCenter.y - dirY * (toOffset + 5),
     }
 
-    // 简单的直线路径
+    // 检查是否有多条边连接同样的两个节点
+    const parallelEdges = allEdges.filter(edge => {
+      return (
+        (edge.fromNodeId === this.fromNodeId && edge.toNodeId === this.toNodeId) ||
+        (edge.fromNodeId === this.toNodeId && edge.toNodeId === this.fromNodeId)
+      )
+    })
+
+    // 如果有多条边，对边缘点做垂直偏移
+    if (parallelEdges.length > 1) {
+      const index = parallelEdges.indexOf(this)
+      if (index === -1) return
+
+      const totalEdges = parallelEdges.length
+      const spacing = 20
+      const offset = (index - (totalEdges - 1) / 2) * spacing
+
+      // 使用统一的垂直方向（按节点ID排序保证方向一致）
+      const useReversedDir = this.fromNodeId > this.toNodeId
+      const perpX = useReversedDir ? dirY : -dirY
+      const perpY = useReversedDir ? -dirX : dirX
+
+      start.x += perpX * offset
+      start.y += perpY * offset
+      end.x += perpX * offset
+      end.y += perpY * offset
+    }
+
     this.points = [start, end]
-  }
-
-  // 计算正交路径（直角连线）
-  calculateOrthogonalPath(): void {
-    if (!this.fromNode || !this.toNode) return
-
-    const start = this.fromNode.getCenter()
-    const end = this.toNode.getCenter()
-
-    // 简单的正交路径：中间点
-    const midX = (start.x + end.x) / 2
-
-    this.points = [
-      start,
-      { x: midX, y: start.y },
-      { x: midX, y: end.y },
-      end,
-    ]
   }
 }
