@@ -1137,7 +1137,7 @@ export class GraphiteEditor extends EventEmitter {
       const lineStyle = edge.style.lineStyle || 'straight'
 
       if (lineStyle === 'curved' && edge.points.length === 2) {
-        // 曲线：使用贝塞尔曲线（与 Edge.draw 相同的逻辑）
+        // 简单曲线（两点）：使用贝塞尔曲线（与 Edge.draw 相同的逻辑）
         const start = edge.points[0]
         const end = edge.points[1]
         const dx = end.x - start.x
@@ -1159,7 +1159,7 @@ export class GraphiteEditor extends EventEmitter {
         ctx.moveTo(start.x, start.y)
         ctx.quadraticCurveTo(cp1X, cp1Y, end.x, end.y)
       } else {
-        // 直线或正交线：直接连接点
+        // 直线、正交线或平滑曲线（多点）：直接连接点
         ctx.moveTo(edge.points[0].x, edge.points[0].y)
         for (let i = 1; i < edge.points.length; i++) {
           ctx.lineTo(edge.points[i].x, edge.points[i].y)
