@@ -116,37 +116,16 @@
           <div class="shape-category">
             <div class="category-title">复杂图形</div>
             <div class="shape-grid">
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'table')">
-                <div class="custom-node-preview">📊</div>
-                <span>表格</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'progress')">
-                <div class="custom-node-preview">📈</div>
-                <span>进度条</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'card')">
-                <div class="custom-node-preview">💳</div>
-                <span>卡片</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'gauge')">
-                <div class="custom-node-preview">⏱️</div>
-                <span>仪表盘</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'user-card')">
-                <div class="custom-node-preview">👤</div>
-                <span>用户卡片</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'image-card')">
-                <div class="custom-node-preview">🖼️</div>
-                <span>图片卡片</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'timeline')">
-                <div class="custom-node-preview">⏰</div>
-                <span>时间轴</span>
-              </div>
-              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'stat-card')">
-                <div class="custom-node-preview">📊</div>
-                <span>统计卡片</span>
+              <div
+                v-for="nodeType in customNodeTypes"
+                :key="nodeType.name"
+                class="shape-item"
+                draggable="true"
+                :title="nodeType.description"
+                @dragstart="onCustomNodeDragStart($event, nodeType.name)"
+              >
+                <img :src="nodeType.previewUrl" width="40" height="40" style="object-fit: contain;" />
+                <span>{{ nodeType.label }}</span>
               </div>
             </div>
           </div>
@@ -441,7 +420,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { GraphiteEditor } from '@recall/graphite'
+import { GraphiteEditor, NodeRegistry } from '@recall/graphite'
+import type { NodeTypeDefinition } from '@recall/graphite'
 
 const showExportMenu = ref(false)
 const minimapVisible = ref(false)
@@ -466,6 +446,17 @@ const resizeStartWidth = ref(0)
 let draggedShape: 'rectangle' | 'circle' | 'diamond' | 'triangle' | null = null
 let draggedCustomNodeType: string | null = null
 
+// 注册的自定义节点类型列表（含缩略图）
+const customNodeTypes = ref<Array<NodeTypeDefinition & { previewUrl: string }>>([])
+
+function loadCustomNodeTypes() {
+  const types = NodeRegistry.getInstance().getAll()
+  customNodeTypes.value = types.map((def: NodeTypeDefinition) => ({
+    ...def,
+    previewUrl: NodeRegistry.generatePreview(def, { width: 80, height: 60 }),
+  }))
+}
+
 const nodeStyle = ref({
   fill: '#ffffff',
   stroke: '#333333',
@@ -487,6 +478,9 @@ onMounted(() => {
   if (!canvasRef.value) return
 
   editor = new GraphiteEditor(canvasRef.value)
+
+  // 加载注册的自定义节点类型（在 editor 初始化后，registry 已就绪）
+  loadCustomNodeTypes()
 
   // 初始化主题
   theme.value = editor.getTheme()

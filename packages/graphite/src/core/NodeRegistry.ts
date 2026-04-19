@@ -15,10 +15,13 @@ export interface EditableConfig {
 
 export interface NodeTypeDefinition {
   name: string
+  label: string                    // 侧边栏显示名称
+  description?: string             // 可选的 tooltip 描述
   render: CustomRenderFunction
+  preview?: CustomRenderFunction   // 可选的简化预览渲染函数，不提供则 fallback 到 render
   defaultData?: Record<string, any>
   defaultSize?: { width: number; height: number }
-  editable?: EditableConfig  // 编辑配置
+  editable?: EditableConfig
 }
 
 /**
@@ -76,6 +79,7 @@ export class NodeRegistry {
     // 表格节点 - 不可编辑
     this.register({
       name: 'table',
+      label: '表格',
       defaultSize: { width: 200, height: 150 },
       defaultData: {
         headers: ['列1', '列2'],
@@ -143,6 +147,7 @@ export class NodeRegistry {
     // 进度条节点 - 可编辑标签
     this.register({
       name: 'progress',
+      label: '进度条',
       defaultSize: { width: 200, height: 60 },
       defaultData: {
         label: '进度',
@@ -206,6 +211,7 @@ export class NodeRegistry {
     // 卡片节点 - 可编辑标题
     this.register({
       name: 'card',
+      label: '卡片',
       defaultSize: { width: 180, height: 120 },
       defaultData: {
         title: '标题',
@@ -263,6 +269,7 @@ export class NodeRegistry {
     // 仪表盘节点 - 可编辑标签
     this.register({
       name: 'gauge',
+      label: '仪表盘',
       defaultSize: { width: 180, height: 180 },
       defaultData: {
         label: '速度',
@@ -350,6 +357,7 @@ export class NodeRegistry {
     // 用户卡片节点 - 可编辑姓名
     this.register({
       name: 'user-card',
+      label: '用户卡片',
       defaultSize: { width: 200, height: 140 },
       defaultData: {
         name: '张三',
@@ -429,6 +437,7 @@ export class NodeRegistry {
     // 图片卡片节点 - 可编辑标题
     this.register({
       name: 'image-card',
+      label: '图片卡片',
       defaultSize: { width: 200, height: 180 },
       defaultData: {
         title: '图片标题',
@@ -499,6 +508,7 @@ export class NodeRegistry {
     // 时间轴节点 - 可编辑标题
     this.register({
       name: 'timeline',
+      label: '时间轴',
       defaultSize: { width: 220, height: 200 },
       defaultData: {
         title: '项目进度',
@@ -577,6 +587,7 @@ export class NodeRegistry {
     // 统计卡片节点 - 可编辑标签
     this.register({
       name: 'stat-card',
+      label: '统计卡片',
       defaultSize: { width: 180, height: 120 },
       defaultData: {
         label: '总销售额',
@@ -648,5 +659,53 @@ export class NodeRegistry {
         ctx.stroke()
       }
     })
+  }
+
+  /**
+   * 用节点的 render（或 preview）函数渲染一张缩略图，返回 data URL。
+   * 在浏览器环境下调用，SSR 场景不适用。
+   */
+  static generatePreview(
+    definition: NodeTypeDefinition,
+    size: { width: number; height: number } = { width: 80, height: 60 }
+  ): string {
+    const canvas = document.createElement('canvas')
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = size.width * dpr
+    canvas.height = size.height * dpr
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return ''
+
+    ctx.scale(dpr, dpr)
+
+    const nodeWidth = definition.defaultSize?.width || 120
+    const nodeHeight = definition.defaultSize?.height || 80
+
+    // 等比缩放，留 4px 内边距
+    const padding = 4
+    const availW = size.width - padding * 2
+    const availH = size.height - padding * 2
+    const scale = Math.min(availW / nodeWidth, availH / nodeHeight)
+
+    // 居中偏移
+    const offsetX = padding + (availW - nodeWidth * scale) / 2
+    const offsetY = padding + (availH - nodeHeight * scale) / 2
+
+    ctx.save()
+    ctx.translate(offsetX, offsetY)
+    ctx.scale(scale, scale)
+
+    const renderFn = definition.preview ?? definition.render
+    renderFn({
+      ctx,
+      bounds: { x: 0, y: 0, width: nodeWidth, height: nodeHeight },
+      data: definition.defaultData ?? {},
+      isSelected: false,
+    })
+
+    ctx.restore()
+
+    return canvas.toDataURL()
   }
 }
