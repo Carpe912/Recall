@@ -4,83 +4,148 @@
       <canvas ref="canvasRef" class="canvas"></canvas>
 
       <!-- 右侧样式面板 -->
-      <div class="sidebar" v-if="selectedNodes.length > 0">
-        <h3>节点样式</h3>
-        <div class="style-control">
-          <label>填充颜色</label>
-          <input type="color" v-model="nodeStyle.fill" @input="updateSelectedNodesStyle">
+      <div class="sidebar" v-if="selectedNodes.length > 0 || selectedEdges.length > 0">
+        <!-- 节点样式 -->
+        <div v-if="selectedNodes.length > 0">
+          <h3>节点样式</h3>
+          <div class="style-control">
+            <label>填充颜色</label>
+            <input type="color" v-model="nodeStyle.fill" @input="updateSelectedNodesStyle">
+          </div>
+          <div class="style-control">
+            <label>边框颜色</label>
+            <input type="color" v-model="nodeStyle.stroke" @input="updateSelectedNodesStyle">
+          </div>
+          <div class="style-control">
+            <label>边框宽度</label>
+            <input type="range" min="0" max="10" v-model.number="nodeStyle.strokeWidth" @input="updateSelectedNodesStyle">
+            <span>{{ nodeStyle.strokeWidth }}px</span>
+          </div>
+          <div class="style-control">
+            <label>圆角</label>
+            <input type="range" min="0" max="50" v-model.number="nodeStyle.borderRadius" @input="updateSelectedNodesStyle">
+            <span>{{ nodeStyle.borderRadius }}px</span>
+          </div>
+          <div class="style-control">
+            <label>阴影模糊</label>
+            <input type="range" min="0" max="30" v-model.number="nodeStyle.shadowBlur" @input="updateSelectedNodesStyle">
+            <span>{{ nodeStyle.shadowBlur }}px</span>
+          </div>
+          <div class="style-control">
+            <label>透明度</label>
+            <input type="range" min="0" max="1" step="0.1" v-model.number="nodeStyle.opacity" @input="updateSelectedNodesStyle">
+            <span>{{ nodeStyle.opacity }}</span>
+          </div>
         </div>
-        <div class="style-control">
-          <label>边框颜色</label>
-          <input type="color" v-model="nodeStyle.stroke" @input="updateSelectedNodesStyle">
-        </div>
-        <div class="style-control">
-          <label>边框宽度</label>
-          <input type="range" min="0" max="10" v-model.number="nodeStyle.strokeWidth" @input="updateSelectedNodesStyle">
-          <span>{{ nodeStyle.strokeWidth }}px</span>
-        </div>
-        <div class="style-control">
-          <label>圆角</label>
-          <input type="range" min="0" max="50" v-model.number="nodeStyle.borderRadius" @input="updateSelectedNodesStyle">
-          <span>{{ nodeStyle.borderRadius }}px</span>
-        </div>
-        <div class="style-control">
-          <label>阴影模糊</label>
-          <input type="range" min="0" max="30" v-model.number="nodeStyle.shadowBlur" @input="updateSelectedNodesStyle">
-          <span>{{ nodeStyle.shadowBlur }}px</span>
-        </div>
-        <div class="style-control">
-          <label>透明度</label>
-          <input type="range" min="0" max="1" step="0.1" v-model.number="nodeStyle.opacity" @input="updateSelectedNodesStyle">
-          <span>{{ nodeStyle.opacity }}</span>
+
+        <!-- 连线样式 -->
+        <div v-if="selectedEdges.length > 0">
+          <h3>连线样式</h3>
+          <div class="style-control">
+            <label>线条颜色</label>
+            <input type="color" v-model="edgeStyle.stroke" @input="updateSelectedEdgesStyle">
+          </div>
+          <div class="style-control">
+            <label>线条宽度</label>
+            <input type="range" min="1" max="10" v-model.number="edgeStyle.strokeWidth" @input="updateSelectedEdgesStyle">
+            <span>{{ edgeStyle.strokeWidth }}px</span>
+          </div>
+          <div class="style-control">
+            <label>透明度</label>
+            <input type="range" min="0" max="1" step="0.1" v-model.number="edgeStyle.opacity" @input="updateSelectedEdgesStyle">
+            <span>{{ edgeStyle.opacity }}</span>
+          </div>
+          <div class="style-control">
+            <label>连线类型</label>
+            <select v-model="edgeStyle.lineStyle" @change="updateSelectedEdgesStyle" class="style-select">
+              <option value="straight">直线</option>
+              <option value="curved">曲线</option>
+              <option value="orthogonal">折线</option>
+            </select>
+          </div>
+          <div class="style-control" v-if="edgeStyle.lineStyle === 'orthogonal'">
+            <label>智能路由</label>
+            <div class="checkbox-wrapper">
+              <input type="checkbox" v-model="edgeStyle.useSmartRouting" @change="updateSelectedEdgesStyle">
+              <span>启用</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- 底部浮动工具栏 -->
+      <!-- 左侧形状面板 -->
+      <div class="shapes-panel" :class="{ collapsed: shapesPanelCollapsed }" :style="{ width: shapesPanelWidth + 'px' }">
+        <div class="panel-header">
+          <span>形状</span>
+          <button class="collapse-btn" @click="shapesPanelCollapsed = !shapesPanelCollapsed">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline :points="shapesPanelCollapsed ? '9 18 15 12 9 6' : '15 18 9 12 15 6'"/>
+            </svg>
+          </button>
+        </div>
+        <div class="shapes-content" v-show="!shapesPanelCollapsed">
+          <div class="shape-category">
+            <div class="category-title">基础形状</div>
+            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'rectangle')">
+              <svg width="40" height="40" viewBox="0 0 40 40">
+                <rect x="5" y="10" width="30" height="20" rx="2" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+              </svg>
+              <span>矩形</span>
+            </div>
+            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'circle')">
+              <svg width="40" height="40" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="12" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+              </svg>
+              <span>圆形</span>
+            </div>
+            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'diamond')">
+              <svg width="40" height="40" viewBox="0 0 40 40">
+                <path d="M 20 8 L 32 20 L 20 32 L 8 20 Z" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+              </svg>
+              <span>菱形</span>
+            </div>
+            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'triangle')">
+              <svg width="40" height="40" viewBox="0 0 40 40">
+                <path d="M 20 8 L 32 28 L 8 28 Z" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+              </svg>
+              <span>三角形</span>
+            </div>
+          </div>
+          <div class="shape-category">
+            <div class="category-title">连线样式</div>
+            <div class="edge-style-item" @click="setEdgeLineStyle('straight')" :class="{ active: edgeLineStyle === 'straight' }">
+              <svg width="60" height="30" viewBox="0 0 60 30">
+                <line x1="5" y1="15" x2="55" y2="15" stroke="#666" stroke-width="2"/>
+              </svg>
+              <span>直线</span>
+            </div>
+            <div class="edge-style-item" @click="setEdgeLineStyle('curved')" :class="{ active: edgeLineStyle === 'curved' }">
+              <svg width="60" height="30" viewBox="0 0 60 30">
+                <path d="M 5 15 Q 30 5 55 15" fill="none" stroke="#666" stroke-width="2"/>
+              </svg>
+              <span>曲线</span>
+            </div>
+            <div class="edge-style-item" @click="setEdgeLineStyle('orthogonal')" :class="{ active: edgeLineStyle === 'orthogonal' }">
+              <svg width="60" height="30" viewBox="0 0 60 30">
+                <path d="M 5 15 L 30 15 L 30 10 L 55 10" fill="none" stroke="#666" stroke-width="2"/>
+              </svg>
+              <span>折线</span>
+            </div>
+          </div>
+          <div class="shape-category">
+            <div class="category-title">智能路由</div>
+            <button class="toggle-btn" @click="toggleSmartRouting" :class="{ active: useSmartRouting }">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+              <span>{{ useSmartRouting ? '已启用' : '已禁用' }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="resize-handle" @mousedown="startResizePanel"></div>
+      </div>
+
       <div class="floating-toolbar">
-
-        <!-- 节点 / 连线 -->
-        <button class="icon-btn" @click="addNode">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="5" width="18" height="14" rx="2"/>
-            <line x1="12" y1="9" x2="12" y2="15"/>
-            <line x1="9" y1="12" x2="15" y2="12"/>
-          </svg>
-          <div class="btn-tip">添加节点</div>
-        </button>
-        <select v-model="nodeShape" class="shape-select" title="节点形状">
-          <option value="rectangle">矩形</option>
-          <option value="circle">圆形</option>
-          <option value="diamond">菱形</option>
-          <option value="triangle">三角形</option>
-        </select>
-        <button class="icon-btn" @click="addEdge" :disabled="selectedNodes.length !== 2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="5" cy="12" r="2.5"/>
-            <circle cx="19" cy="12" r="2.5"/>
-            <line x1="7.5" y1="12" x2="14" y2="12"/>
-            <polyline points="13 9 16.5 12 13 15"/>
-          </svg>
-          <div class="btn-tip">添加连线（先选中 2 个节点）</div>
-        </button>
-        <select v-model="edgeLineStyle" class="shape-select" title="连线样式">
-          <option value="straight">直线</option>
-          <option value="curved">曲线</option>
-          <option value="orthogonal">折线</option>
-        </select>
-        <button class="icon-btn" @click="toggleSmartRouting" :class="{ active: useSmartRouting }">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
-            <polyline points="7.5 19.79 7.5 14.6 3 12"/>
-            <polyline points="21 12 16.5 14.6 16.5 19.79"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-          <div class="btn-tip">智能路由（连线避开节点）</div>
-        </button>
-
-        <div class="toolbar-sep"></div>
 
         <!-- 铅笔工具 -->
         <button class="icon-btn" @click="togglePencilMode" :class="{ active: isPencilMode }">
@@ -259,6 +324,18 @@
 
         <div class="toolbar-sep"></div>
 
+        <!-- 小地图 -->
+        <button class="icon-btn" @click="toggleMinimap" :class="{ active: minimapVisible }">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+            <line x1="8" y1="2" x2="8" y2="18"/>
+            <line x1="16" y1="6" x2="16" y2="22"/>
+          </svg>
+          <div class="btn-tip">{{ minimapVisible ? '隐藏小地图' : '显示小地图' }}</div>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
         <!-- 主题切换 -->
         <button class="icon-btn" @click="toggleTheme">
           <svg v-if="theme === 'light'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -299,16 +376,25 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { GraphiteEditor } from '@recall/graphite'
 
 const showExportMenu = ref(false)
+const minimapVisible = ref(false)
 
 const canvasRef = ref<HTMLCanvasElement>()
 let editor: GraphiteEditor | null = null
 const selectedNodes = ref<string[]>([])
+const selectedEdges = ref<string[]>([])
 const layoutType = ref<'hierarchical' | 'tree' | 'force' | 'circular' | 'grid'>('hierarchical')
-const nodeShape = ref<'rectangle' | 'circle' | 'diamond' | 'triangle'>('rectangle')
 const edgeLineStyle = ref<'straight' | 'curved' | 'orthogonal'>('straight')
 const theme = ref<'light' | 'dark'>('light')
 const useSmartRouting = ref(false)
 const isPencilMode = ref(false)
+
+// 左侧形状面板
+const shapesPanelCollapsed = ref(false)
+const shapesPanelWidth = ref(220)
+const isResizingPanel = ref(false)
+const resizeStartX = ref(0)
+const resizeStartWidth = ref(0)
+let draggedShape: 'rectangle' | 'circle' | 'diamond' | 'triangle' | null = null
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -317,6 +403,14 @@ const nodeStyle = ref({
   borderRadius: 8,
   shadowBlur: 0,
   opacity: 1,
+})
+
+const edgeStyle = ref({
+  stroke: '#666666',
+  strokeWidth: 2,
+  opacity: 1,
+  lineStyle: 'straight' as 'straight' | 'curved' | 'orthogonal',
+  useSmartRouting: false,
 })
 
 onMounted(() => {
@@ -344,6 +438,22 @@ onMounted(() => {
         }
       }
     }
+
+    // 更新选中的边
+    const selectionManager = editor!['selectionManager']
+    const selectedEdgeObjects = selectionManager.getSelectedEdges()
+    selectedEdges.value = selectedEdgeObjects.map((e: any) => e.id)
+
+    if (selectedEdgeObjects.length > 0) {
+      const firstEdge = selectedEdgeObjects[0]
+      edgeStyle.value = {
+        stroke: firstEdge.style.stroke,
+        strokeWidth: firstEdge.style.strokeWidth,
+        opacity: firstEdge.style.opacity,
+        lineStyle: firstEdge.style.lineStyle || 'straight',
+        useSmartRouting: firstEdge.style.useSmartRouting || false,
+      }
+    }
   })
 
   const node1 = editor.createNode({ x: 200, y: 150, width: 120, height: 80, content: 'Node 1' })
@@ -358,34 +468,84 @@ onMounted(() => {
 
   editor.createEdge({ from: node1.id, to: node2.id })
   editor.createEdge({ from: node1.id, to: node3.id })
+
+  // 监听画布的 drop 事件（从形状面板拖拽）
+  if (canvasRef.value) {
+    canvasRef.value.addEventListener('dragover', onCanvasDragOver)
+    canvasRef.value.addEventListener('drop', onCanvasDrop)
+  }
 })
 
 onUnmounted(() => {
   editor?.destroy()
+  document.removeEventListener('mousemove', onResizePanelMove)
+  document.removeEventListener('mouseup', onResizePanelEnd)
+  if (canvasRef.value) {
+    canvasRef.value.removeEventListener('dragover', onCanvasDragOver)
+    canvasRef.value.removeEventListener('drop', onCanvasDrop)
+  }
 })
 
-function addNode() {
-  if (!editor) return
-  editor.createNode({
-    x: Math.random() * 600 + 100,
-    y: Math.random() * 400 + 100,
-    width: 120,
-    height: 80,
-    content: `Node ${Date.now()}`,
-    shape: nodeShape.value
-  })
+// 画布拖放事件
+function onCanvasDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'copy'
+  }
 }
 
-function addEdge() {
-  if (!editor || selectedNodes.value.length !== 2) return
-  editor.createEdge({
-    from: selectedNodes.value[0],
-    to: selectedNodes.value[1],
-    style: {
-      lineStyle: edgeLineStyle.value,
-      useSmartRouting: useSmartRouting.value
-    }
+function onCanvasDrop(e: DragEvent) {
+  e.preventDefault()
+  if (!editor || !draggedShape || !canvasRef.value) return
+
+  const rect = canvasRef.value.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+
+  // 转换为世界坐标
+  const camera = editor['renderer'].getCamera()
+  const worldPoint = camera.screenToWorld({ x, y })
+
+  // 创建节点
+  editor.createNode({
+    x: worldPoint.x,
+    y: worldPoint.y,
+    width: 120,
+    height: 80,
+    content: `${draggedShape.charAt(0).toUpperCase() + draggedShape.slice(1)}`,
+    shape: draggedShape
   })
+
+  draggedShape = null
+}
+
+// 形状拖拽开始
+function onShapeDragStart(e: DragEvent, shape: 'rectangle' | 'circle' | 'diamond' | 'triangle') {
+  draggedShape = shape
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+}
+
+// 面板调整大小
+function startResizePanel(e: MouseEvent) {
+  isResizingPanel.value = true
+  resizeStartX.value = e.clientX
+  resizeStartWidth.value = shapesPanelWidth.value
+  document.addEventListener('mousemove', onResizePanelMove)
+  document.addEventListener('mouseup', onResizePanelEnd)
+}
+
+function onResizePanelMove(e: MouseEvent) {
+  if (!isResizingPanel.value) return
+  const dx = e.clientX - resizeStartX.value
+  shapesPanelWidth.value = Math.max(180, Math.min(400, resizeStartWidth.value + dx))
+}
+
+function onResizePanelEnd() {
+  isResizingPanel.value = false
+  document.removeEventListener('mousemove', onResizePanelMove)
+  document.removeEventListener('mouseup', onResizePanelEnd)
 }
 
 function undo() { editor?.undo() }
@@ -393,10 +553,27 @@ function redo() { editor?.redo() }
 function autoLayout() { editor?.autoLayout({ type: layoutType.value }) }
 function clear() { editor?.clear() }
 
+function setEdgeLineStyle(style: 'straight' | 'curved' | 'orthogonal') {
+  edgeLineStyle.value = style
+  if (!editor) return
+  // 更新编辑器的默认连线样式
+  editor.setDefaultEdgeStyle({
+    lineStyle: style,
+    useSmartRouting: useSmartRouting.value
+  })
+}
+
 function toggleSmartRouting() {
   useSmartRouting.value = !useSmartRouting.value
-  // 更新所有现有的折线边
   if (!editor) return
+
+  // 更新默认连线样式
+  editor.setDefaultEdgeStyle({
+    lineStyle: edgeLineStyle.value,
+    useSmartRouting: useSmartRouting.value
+  })
+
+  // 更新所有现有的折线边
   const edges = editor.getEdges()
   edges.forEach((edge: any) => {
     if (edge.style.lineStyle === 'orthogonal') {
@@ -409,6 +586,13 @@ function togglePencilMode() {
   isPencilMode.value = !isPencilMode.value
   if (!editor) return
   editor.setPencilMode(isPencilMode.value)
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function toggleMinimap() {
+  if (!editor) return
+  editor.toggleMinimap()
+  minimapVisible.value = editor.isMinimapVisible()
 }
 
 // 对齐工具
@@ -431,6 +615,16 @@ function toggleTheme() {
 function updateSelectedNodesStyle() {
   if (!editor || selectedNodes.value.length === 0) return
   editor.updateNodesStyle(selectedNodes.value, nodeStyle.value)
+}
+
+function updateSelectedEdgesStyle() {
+  if (!editor || selectedEdges.value.length === 0) return
+  selectedEdges.value.forEach((edgeId: string) => {
+    editor!.updateEdgeStyle(edgeId, edgeStyle.value)
+  })
+  // 如果改变了连线类型，需要更新路径
+  editor['updateEdges']()
+  editor['renderer'].markDirty()
 }
 
 function exportJSON() {
@@ -509,6 +703,177 @@ function ungroupSelected() { editor?.ungroupSelected() }
   background: #fff;
 }
 
+/* 左侧形状面板 */
+.shapes-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(250, 250, 250, 0.98);
+  border-right: 1px solid #e5e5e5;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  box-sizing: border-box;
+  transition: width 0.2s ease;
+}
+
+.shapes-panel.collapsed {
+  width: 40px !important;
+}
+
+.panel-header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #e5e5e5;
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.collapse-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #888;
+  transition: background 0.15s, color 0.15s;
+}
+
+.collapse-btn:hover {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.shapes-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.shape-category {
+  margin-bottom: 20px;
+}
+
+.category-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.shape-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  cursor: grab;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.shape-item:hover {
+  background: #f5f5f5;
+  border-color: #1976d2;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.shape-item:active {
+  cursor: grabbing;
+}
+
+.shape-item span {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #666;
+}
+
+.edge-style-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.edge-style-item:hover {
+  background: #f5f5f5;
+  border-color: #1976d2;
+}
+
+.edge-style-item.active {
+  background: #e3f2fd;
+  border-color: #1976d2;
+}
+
+.edge-style-item span {
+  font-size: 11px;
+  color: #666;
+}
+
+.toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 12px;
+  color: #666;
+}
+
+.toggle-btn:hover {
+  background: #f5f5f5;
+  border-color: #1976d2;
+}
+
+.toggle-btn.active {
+  background: #e3f2fd;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: ew-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.resize-handle:hover {
+  background: #1976d2;
+}
+
 /* 右侧样式面板：绝对定位覆盖画布，不参与 flex 布局，避免 canvas 宽度变化触发 ResizeObserver 重绘 */
 .sidebar {
   position: absolute;
@@ -563,6 +928,39 @@ function ungroupSelected() { editor?.ungroupSelected() }
   color: #888;
   min-width: 36px;
   display: inline-block;
+}
+
+.style-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666;
+  background: white;
+  cursor: pointer;
+  outline: none;
+}
+
+.style-select:hover {
+  border-color: #1976d2;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-wrapper input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checkbox-wrapper span {
+  font-size: 12px;
+  color: #666;
 }
 
 /* 浮动工具栏 */

@@ -45,6 +45,9 @@ export class GraphiteEditor extends EventEmitter {
   private selectionBoxStart: Point | null = null
   private selectionBoxEnd: Point | null = null
 
+  // 默认连线样式
+  private defaultEdgeStyle: Partial<EdgeStyle> = {}
+
   // 铅笔工具状态
   private isPencilMode: boolean = false
   private isDrawing: boolean = false
@@ -435,11 +438,12 @@ export class GraphiteEditor extends EventEmitter {
       const targetNode = this.findNodeAt(worldPoint)
 
       if (targetNode && targetNode !== this.edgeStartNode) {
-        // 创建连线
+        // 创建连线，应用默认样式
         try {
           this.createEdge({
             from: this.edgeStartNode.id,
             to: targetNode.id,
+            style: this.defaultEdgeStyle,
           })
         } catch (error) {
           console.error('Failed to create edge:', error)
@@ -1216,6 +1220,7 @@ export class GraphiteEditor extends EventEmitter {
     this.nodes = []
     this.edges = []
     this.groups = []
+    this.paths = []
     this.selectionManager.clear()
     this.commandManager.clear()
     this.renderer.markDirty()
@@ -1523,6 +1528,15 @@ export class GraphiteEditor extends EventEmitter {
     this.renderer.markDirty()
   }
 
+  // 小地图
+  toggleMinimap(): void {
+    this.minimap.toggle()
+  }
+
+  isMinimapVisible(): boolean {
+    return this.minimap.isVisible()
+  }
+
   // 主题切换
   setTheme(theme: Theme): void {
     this.themeManager.setTheme(theme)
@@ -1533,6 +1547,15 @@ export class GraphiteEditor extends EventEmitter {
 
   getTheme(): Theme {
     return this.themeManager.getTheme()
+  }
+
+  // 设置默认连线样式
+  setDefaultEdgeStyle(style: Partial<EdgeStyle>): void {
+    this.defaultEdgeStyle = style
+  }
+
+  getDefaultEdgeStyle(): Partial<EdgeStyle> {
+    return this.defaultEdgeStyle
   }
 
   // 销毁
