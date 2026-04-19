@@ -132,7 +132,7 @@
               <span>折线</span>
             </div>
           </div>
-          <div class="shape-category">
+          <div class="shape-category" v-if="edgeLineStyle === 'orthogonal'">
             <div class="category-title">智能路由</div>
             <button class="toggle-btn" @click="toggleSmartRouting" :class="{ active: useSmartRouting }">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">

@@ -331,22 +331,8 @@ export class Edge extends GraphicObject {
         // 简单的正交路径
         this.points = this.calculateOrthogonalPath(start, end)
       }
-    } else if (lineStyle === 'curved' && this.style.useSmartRouting) {
-      // 曲线 + 智能路由：使用 A* 找路径，然后平滑化
-      const router = new PathfindingRouter()
-      const obstacleNodes = allNodes.filter(
-        node => node.id !== this.fromNodeId && node.id !== this.toNodeId
-      )
-      const pathPoints = router.findPath(start, end, obstacleNodes)
-
-      // 如果路径点超过2个，进行平滑处理
-      if (pathPoints.length > 2) {
-        this.points = this.smoothPath(pathPoints)
-      } else {
-        this.points = pathPoints
-      }
     } else {
-      // 直线或曲线（无智能路由）：两点
+      // 直线或曲线：两点
       this.points = [start, end]
     }
   }
@@ -381,10 +367,6 @@ export class Edge extends GraphicObject {
 
     // 使用 Catmull-Rom 样条曲线进行平滑
     const smoothed: Point[] = []
-    const tension = 0.5 // 张力参数
-
-    // 保留起点
-    smoothed.push(points[0])
 
     // 对中间的每一段进行插值
     for (let i = 0; i < points.length - 1; i++) {
@@ -402,29 +384,26 @@ export class Edge extends GraphicObject {
         const u2 = u * u
         const u3 = u2 * u
 
-        const x = tension * (
+        const x = 0.5 * (
           (2 * p1.x) +
           (-p0.x + p2.x) * u +
           (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * u2 +
           (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * u3
         )
 
-        const y = tension * (
+        const y = 0.5 * (
           (2 * p1.y) +
           (-p0.y + p2.y) * u +
           (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * u2 +
           (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * u3
         )
 
-        // 避免重复添加相同的点
+        // 避免在段的起点重复添加（除了第一段）
         if (t > 0 || i === 0) {
           smoothed.push({ x, y })
         }
       }
     }
-
-    // 保留终点
-    smoothed.push(points[points.length - 1])
 
     return smoothed
   }
