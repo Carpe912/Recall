@@ -2,41 +2,62 @@
 
 A collaborative canvas editor for knowledge management.
 
-石墨 - 为知识管理打造的协作画布编辑器
+石墨 — 为知识管理打造的协作画布编辑器
 
 ## Features
 
-- 🎨 Canvas-based rendering
-- 🔗 Nodes and edges
-- 🖱️ Interactive (drag, select, resize, rotate)
-- ↩️ Undo/Redo
-- 🎯 Spatial indexing (QuadTree)
-- 🔄 Collaboration ready (Yjs integration)
-- 🎭 Layout algorithms (hierarchical, force-directed)
-- 🎨 Custom node types with reactive data
-- 📝 In-place text editing
-- 🖼️ Built-in rich node types (table, progress, gauge, cards, timeline)
+- **Nodes** — rectangle / circle / diamond / triangle, resizable, double-click text editing
+- **Edges** — straight / Bézier / orthogonal, arrows, parallel-edge offset, magnetic port snapping
+- **Draggable waypoints** — drag interior control points on any edge; undo/redo supported
+- **Configurable ports** — define any number of ports per node with normalized position and type (input / output / both)
+- **Connection validation** — built-in rules (no self-loop, no duplicate, port-type compatibility) plus custom rule registration
+- **Rich style system** — font family, gradient border (`strokeGradient`), named dash presets (`solid / dashed / dotted / long-dash / dot-dash`)
+- **Transaction API** — `beginTransaction / commitTransaction / rollbackTransaction` for atomic undo/redo
+- **Complete serialization** — JSON v2 preserves shape, nodeType, data, imageData, waypoints, ports, label
+- **Smart routing** — A\* pathfinding around obstacles
+- **Layout algorithms** — hierarchical / tree / force-directed / circular / grid
+- **Custom node types** — reactive data + custom Canvas render function
+- **In-place text editing** — transparent textarea overlay, real-time canvas re-render
+- **Minimap** — overview navigation
+- **Themes** — light / dark, persisted to localStorage
+- **Clipboard** — copy / cut / paste (preserves edge relationships)
+- **Collaboration-ready** — Yjs CRDT interface stubs included
 
 ## Architecture
 
 ```
-graphite/
-├── core/              # Core data structures
-│   ├── GraphicObject  # Base class for all objects
-│   ├── Node           # Node implementation
-│   ├── Edge           # Edge implementation
-│   ├── CustomNode     # Custom node with reactive data
-│   ├── NodeRegistry   # Node type registry
-│   └── Transform      # Transform system
-├── renderer/          # Rendering system
-│   ├── Renderer       # Main renderer
-│   └── Camera         # Viewport management
-├── interaction/       # Interaction system
-│   ├── SelectionManager
-│   ├── DragManager
-│   └── CommandManager
-├── layout/            # Layout algorithms
-└── index.ts           # Main entry
+graphite/src/
+├── GraphiteEditor.ts         # Façade — single public API entry point
+├── core/
+│   ├── GraphicObject.ts      # Abstract base for all scene objects
+│   ├── Node.ts               # Node with configurable ports
+│   ├── Edge.ts               # Edge with waypoints support
+│   ├── CustomNode.ts         # Custom node with reactive data
+│   ├── NodeRegistry.ts       # Node type registry
+│   ├── Group.ts              # Visual grouping
+│   ├── Path.ts               # Freehand drawing path
+│   └── ImageNode.ts          # Image node
+├── renderer/
+│   ├── Renderer.ts           # Canvas renderer
+│   ├── Camera.ts             # Viewport (pan / zoom)
+│   └── DirtyRectManager.ts   # Dirty-rect optimisation
+├── interaction/
+│   ├── CommandManager.ts     # Undo/redo + transaction support
+│   ├── Commands.ts           # Move, Create, Delete, MoveWaypoint
+│   ├── SelectionManager.ts
+│   └── DragManager.ts
+├── ui/
+│   ├── ContextMenu.ts
+│   └── Minimap.ts
+├── utils/
+│   ├── ConnectionValidator.ts  # Connection rule engine
+│   ├── LayoutEngine.ts
+│   ├── PathfindingRouter.ts    # A* smart routing
+│   ├── SnapGuide.ts
+│   ├── ThemeManager.ts
+│   ├── EventEmitter.ts
+│   └── geometry.ts
+└── index.ts                  # Public exports
 ```
 
 ## Usage
@@ -49,124 +70,158 @@ import { GraphiteEditor } from '@recall/graphite'
 const canvas = document.getElementById('canvas') as HTMLCanvasElement
 const editor = new GraphiteEditor(canvas)
 
-// Create a node
-const node = editor.createNode({
-  x: 100,
-  y: 100,
-  width: 120,
-  height: 80,
-  content: 'Hello World'
+// Create nodes
+const node1 = editor.createNode({
+  x: 100, y: 100, width: 120, height: 80, content: 'Start'
+})
+const node2 = editor.createNode({
+  x: 300, y: 100, width: 120, height: 80, content: 'End'
 })
 
 // Create an edge
-const edge = editor.createEdge({
-  from: node1.id,
-  to: node2.id
+editor.createEdge({ from: node1.id, to: node2.id })
+```
+
+### Configurable Ports
+
+```typescript
+import type { PortDefinition } from '@recall/graphite'
+
+// Custom port layout — entry on left, exit on right (no top/bottom)
+editor.setNodePorts(node1.id, [
+  { id: 'in',  dx: -0.5, dy: 0, type: 'input'  },
+  { id: 'out', dx:  0.5, dy: 0, type: 'output' },
+])
+
+// Reset to default 4-port layout
+editor.resetNodePorts(node1.id)
+```
+
+### Connection Validation
+
+```typescript
+import { createDefaultValidator } from '@recall/graphite'
+
+// Pre-built validator: no self-loop + no duplicate + port-type compat
+const validator = createDefaultValidator()
+editor.setConnectionValidator(validator)
+
+// Add a project-specific rule
+editor.addConnectionRule('max-out-degree', (fromNode, _to, _fp, _tp, edges) => {
+  const outCount = edges.filter(e => e.fromNodeId === fromNode.id).length
+  if (outCount >= 3) return 'A node may have at most 3 outgoing connections'
+  return true
 })
+
+// Listen for rejections in the UI
+editor.on('connectionRejected', ({ reason }) => {
+  alert(reason)
+})
+```
+
+### Draggable Waypoints
+
+Waypoints are interactive automatically — select an edge, then drag the diamond handle on any interior point. Use undo/redo (Ctrl+Z) to revert.
+
+```typescript
+// Programmatically set waypoints
+const edge = editor.createEdge({ from: node1.id, to: node2.id })
+edge.waypoints = [{ x: 200, y: 50 }]  // fixed via point
+```
+
+### Style System
+
+```typescript
+// Font family
+editor.updateNodeStyle(node1.id, { fontFamily: 'Georgia, serif' })
+
+// Gradient border (horizontal, left → right)
+editor.updateNodeStyle(node1.id, { strokeGradient: ['#667eea', '#764ba2'] })
+
+// Named dash presets on edges
+editor.updateEdgeStyle(edge.id, { dashPreset: 'dashed' })
+// Presets: 'solid' | 'dashed' | 'dotted' | 'long-dash' | 'dot-dash'
+```
+
+### Transaction API
+
+```typescript
+editor.beginTransaction('bulk-create')
+try {
+  const a = editor.createNode({ x: 0,   y: 0,   width: 100, height: 60, content: 'A' })
+  const b = editor.createNode({ x: 200, y: 0,   width: 100, height: 60, content: 'B' })
+  const c = editor.createNode({ x: 100, y: 150, width: 100, height: 60, content: 'C' })
+  editor.createEdge({ from: a.id, to: c.id })
+  editor.createEdge({ from: b.id, to: c.id })
+  editor.commitTransaction()        // one entry in undo history
+} catch (e) {
+  editor.rollbackTransaction()      // undo everything
+}
+```
+
+### Serialization (JSON v2)
+
+```typescript
+// Export — includes ports, waypoints, shape, nodeType, imageData
+const json = editor.exportToJSON()
+
+// Import — fully restores all node/edge types
+editor.importFromJSON(json)
 ```
 
 ### Custom Node Types
 
-Register custom node types with reactive data and custom rendering:
-
 ```typescript
-import { NodeRegistry } from '@recall/graphite'
+import type { NodeTypeDefinition } from '@recall/graphite'
 
-const registry = NodeRegistry.getInstance()
-
-registry.register({
+editor.registerNodeType({
   name: 'progress',
-  label: '进度条',
-  description: 'A progress bar node',
   defaultSize: { width: 200, height: 60 },
-  defaultData: {
-    label: '进度',
-    value: 60,
-    max: 100
-  },
-  editable: {
-    enabled: true,
-    field: 'label',
-    multiline: false,
-    offsetX: 15,
-    offsetY: 15,
-    width: 160,
-    height: 18,
-    fontSize: 13,
-    fontWeight: 'normal',
-    textAlign: 'left'
-  },
+  defaultData: { label: 'Loading…', value: 0, max: 100 },
+  editable: { enabled: true, field: 'label', offsetX: 12, offsetY: 10, fontSize: 13 },
   render: ({ ctx, bounds, data }) => {
-    const { label, value, max } = data
-    // Custom rendering logic
-    ctx.fillStyle = '#ffffff'
+    const pct = data.value / data.max
+    ctx.fillStyle = '#f0f0f0'
     ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height)
-    // ... draw progress bar
+    ctx.fillStyle = '#4A90E2'
+    ctx.fillRect(bounds.x, bounds.y, bounds.width * pct, bounds.height)
+    ctx.fillStyle = '#333'
+    ctx.font = '13px sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(data.label, bounds.x + 12, bounds.y + 20)
   }
 })
 
-// Create a custom node
-const customNode = editor.createCustomNode({
-  x: 200,
-  y: 200,
-  nodeType: 'progress'
-})
-
-// Update node data (triggers re-render automatically)
-editor.updateCustomNodeData(customNode.id, { value: 80 })
+const node = editor.createCustomNode({ x: 100, y: 100, nodeType: 'progress' })
+editor.updateCustomNodeData(node.id, { value: 75 })
 ```
 
-### Generate Preview Thumbnails
+## Keyboard Shortcuts
 
-Generate preview thumbnails for custom node types (useful for toolbars/palettes):
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + Z` | Undo |
+| `Ctrl/Cmd + Shift + Z` | Redo |
+| `Ctrl/Cmd + C` | Copy |
+| `Ctrl/Cmd + X` | Cut |
+| `Ctrl/Cmd + V` | Paste |
+| `Delete / Backspace` | Delete selected |
+| `Space + drag` | Pan canvas |
 
-```typescript
-import { NodeRegistry } from '@recall/graphite'
-
-const registry = NodeRegistry.getInstance()
-const nodeType = registry.get('progress')
-
-// Generate a 80x60 preview thumbnail
-const previewUrl = NodeRegistry.generatePreview(nodeType, { width: 80, height: 60 })
-
-// Use in UI
-const img = document.createElement('img')
-img.src = previewUrl
-```
-
-### In-Place Text Editing
-
-Double-click on editable custom nodes to edit text fields directly on the canvas. The editing experience uses a transparent textarea overlay that shows only the cursor, while the canvas re-renders the text in real-time.
-
-Configure editable fields in the node type definition:
+## Exports
 
 ```typescript
-editable: {
-  enabled: true,
-  field: 'label',           // data field to edit
-  multiline: false,         // single or multi-line
-  offsetX: 15,              // pixel offset from node top-left
-  offsetY: 15,
-  width: 160,               // input width
-  height: 18,               // input height
-  fontSize: 13,             // must match canvas font size
-  fontWeight: 'normal',     // must match canvas font weight
-  textAlign: 'left'         // must match canvas text alignment
+// Classes
+export { GraphiteEditor, Node, Edge, CustomNode, NodeRegistry, Group }
+export { Renderer, Camera, CommandManager, CompoundCommand }
+export { ConnectionValidator, createDefaultValidator }
+export { LayoutEngine, EventEmitter, Animator }
+
+// Types
+export type {
+  NodeData, NodeStyle, EdgeData, EdgeStyle,
+  PortDefinition, DashPreset,
+  ConnectionRule, ValidationResult,
+  Point, Rect, Transform, ICommand, LayoutOptions
 }
 ```
-
-### Built-in Node Types
-
-Graphite includes 8 built-in rich node types:
-
-- **table** - Data table with headers and rows
-- **progress** - Progress bar with label and percentage
-- **card** - Gradient card with icon, title, subtitle, and value
-- **gauge** - Circular gauge/speedometer
-- **user-card** - User profile card with avatar and status
-- **image-card** - Image card with title, description, and tags
-- **timeline** - Timeline with events and status indicators
-- **stat-card** - Statistics card with trend indicator
-
-All built-in types support in-place text editing on their primary text fields.
-

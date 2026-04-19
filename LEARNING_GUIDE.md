@@ -26,8 +26,14 @@
 18. [自定义节点系统](#18-自定义节点系统)
 19. [导入导出](#19-导入导出)
 20. [事件总线](#20-事件总线)
-21. [UI 层：Playground（Vue 应用）](#21-ui-层playground-vue-应用)
-22. [构建一个图形编辑器的完整路径](#22-构建一个图形编辑器的完整路径)
+21. [可拖动折点（Waypoint）](#21-可拖动折点waypoint)
+22. [可配置连接点（Port）](#22-可配置连接点port)
+23. [样式系统增强](#23-样式系统增强)
+24. [连接规则校验（ConnectionValidator）](#24-连接规则校验connectionvalidator)
+25. [事务机制（Transaction）](#25-事务机制transaction)
+26. [序列化完整化（JSON v2）](#26-序列化完整化json-v2)
+27. [UI 层：Playground（Vue 应用）](#27-ui-层playground-vue-应用)
+28. [构建一个图形编辑器的完整路径](#28-构建一个图形编辑器的完整路径)
 
 ---
 
@@ -65,9 +71,10 @@ packages/graphite/src/
 │   ├── PathfindingRouter.ts    # A* 智能路由
 │   ├── AlignmentManager.ts     # 对齐工具
 │   ├── ThemeManager.ts         # 主题管理
+│   ├── ConnectionValidator.ts  # 连接规则校验
 │   ├── Animator.ts             # 动画工具
 │   └── geometry.ts             # 几何工具函数
-└── types/index.ts              # TypeScript 类型定义
+└── types/index.ts              # TypeScript 类型定义（含 PortDefinition, DashPreset）
 ```
 
 **分层思路（重要）：**
@@ -1316,7 +1323,280 @@ editor.on('selectionChanged', (nodeIds: string[]) => {
 
 ---
 
-## 21. UI 层：Playground（Vue 应用）
+## 21. 可拖动折点（Waypoint）
+
+**文件：** [core/Edge.ts](packages/graphite/src/core/Edge.ts) · [interaction/Commands.ts](packages/graphite/src/interaction/Commands.ts)
+
+折点（Waypoint）是用户手动设置的中间控制点，使连线可以按自定义路径弯折。
+
+### 21.1 数据结构
+
+```typescript
+class Edge {
+  points: Point[]      // 渲染用的最终路径（自动计算）
+  waypoints: Point[]   // 用户定义的中间点（手动）
+}
+```
+
+`updatePath()` 中的逻辑：
+```typescript
+if (this.waypoints.length > 0) {
+  this.points = [start, ...this.waypoints, end]  // 直接使用手动点
+  return
+}
+// 否则走自动路由（正交/智能路由）
+```
+
+### 21.2 初始化-on-首次拖拽模式
+
+当用户第一次拖拽一条没有手动折点的边时，不需要预先设置 waypoints。代码从 `edge.points`（自动计算的路径）取出内部点，赋值给 `edge.waypoints`：
+
+```typescript
+if (edge.waypoints.length === 0 && edge.points.length > 2) {
+  edge.waypoints = edge.points.slice(1, -1).map(p => ({ ...p }))
+}
+```
+
+这样用户可以直接开始拖拽，系统将自动计算的折点"固化"为手动折点。
+
+### 21.3 MoveWaypointCommand
+
+```typescript
+class MoveWaypointCommand implements ICommand {
+  execute() { this.edge.waypoints[this.index] = { ...this.newPoint } }
+  undo()    { this.edge.waypoints[this.index] = { ...this.oldPoint } }
+}
+```
+
+### 21.4 视觉反馈
+
+选中连线后，在每个 waypoint 位置绘制菱形控制柄（`drawSelection()` 中处理），用户可以直接拖拽。
+
+---
+
+## 22. 可配置连接点（Port）
+
+**文件：** [core/Node.ts](packages/graphite/src/core/Node.ts) · [types/index.ts](packages/graphite/src/types/index.ts)
+
+默认每个节点有上/右/下/左 4 个固定端口。通过 `PortDefinition` 可以任意自定义。
+
+### 22.1 PortDefinition 接口
+
+```typescript
+interface PortDefinition {
+  id: string               // 唯一标识符
+  dx: number               // 归一化 X 偏移：-0.5 = 左边缘，+0.5 = 右边缘
+  dy: number               // 归一化 Y 偏移：-0.5 = 上边缘，+0.5 = 下边缘
+  type?: 'input' | 'output' | 'both'
+  label?: string
+}
+```
+
+> **归一化坐标的好处**：端口位置与节点尺寸无关。节点缩放后端口依然在正确位置，不需要重新计算。
+
+### 22.2 世界坐标计算
+
+```typescript
+getPortPosition(id: string): Point {
+  const port = this.ports.find(p => p.id === id)
+  return {
+    x: center.x + port.dx * this.width,
+    y: center.y + port.dy * this.height,
+  }
+}
+```
+
+### 22.3 端口类型着色
+
+```
+input  → 绿色  （只能作为连线终点）
+output → 橙色  （只能作为连线起点）
+both   → 蓝色  （两者皆可，默认）
+```
+
+---
+
+## 23. 样式系统增强
+
+**文件：** [core/Node.ts](packages/graphite/src/core/Node.ts) · [core/Edge.ts](packages/graphite/src/core/Edge.ts) · [types/index.ts](packages/graphite/src/types/index.ts)
+
+### 23.1 节点：fontFamily
+
+```typescript
+ctx.font = `${style.fontSize}px ${style.fontFamily}`
+```
+
+允许为每个节点设置不同的字体，例如代码节点用等宽字体、标题节点用衬线字体。
+
+### 23.2 节点：strokeGradient（渐变边框）
+
+```typescript
+if (style.strokeGradient) {
+  const [c1, c2] = style.strokeGradient
+  const grad = ctx.createLinearGradient(-w/2, 0, w/2, 0)
+  grad.addColorStop(0, c1)
+  grad.addColorStop(1, c2)
+  ctx.strokeStyle = grad
+}
+```
+
+Canvas 2D 支持将渐变对象赋给 `strokeStyle`，这是一个常被忽略的特性。
+
+### 23.3 连线：dashPreset
+
+```typescript
+const DASH_PRESETS = {
+  'solid':     [],
+  'dashed':    [8, 4],
+  'dotted':    [2, 4],
+  'long-dash': [16, 6],
+  'dot-dash':  [8, 4, 2, 4],
+}
+
+ctx.setLineDash(DASH_PRESETS[style.dashPreset] ?? [])
+```
+
+命名预设比让用户手写 `strokeDasharray` 字符串更不易出错，且便于枚举。
+
+---
+
+## 24. 连接规则校验（ConnectionValidator）
+
+**文件：** [utils/ConnectionValidator.ts](packages/graphite/src/utils/ConnectionValidator.ts)
+
+### 24.1 设计动机
+
+在 mxGraph 等成熟编辑器中，连线创建前会经过规则校验（例如：不允许自连、不允许超出连接数限制、端口类型必须匹配）。这类逻辑应该从编辑器核心中解耦出来，由外部配置。
+
+### 24.2 规则签名
+
+```typescript
+type ConnectionRule = (
+  fromNode: Node,
+  toNode: Node,
+  fromPortId: string,
+  toPortId: string,
+  existingEdges: Edge[]
+) => true | false | string  // true = 允许，其他 = 拒绝（string 为原因）
+```
+
+### 24.3 使用方式
+
+```typescript
+const validator = new ConnectionValidator()
+  .addRule('no-self-loop', ConnectionValidator.noSelfLoop)
+  .addRule('max-degree',   (from, _to, _fp, _tp, edges) => {
+    const out = edges.filter(e => e.fromNodeId === from.id).length
+    return out < 5 ? true : '最多 5 条出边'
+  })
+
+editor.setConnectionValidator(validator)
+editor.on('connectionRejected', ({ reason }) => showToast(reason))
+```
+
+### 24.4 双重校验点
+
+- **`createEdge()` API**：校验失败时 throw Error，防止程序化创建非法连线
+- **UI 拖拽路径**：校验失败时 emit `connectionRejected` 事件，不 throw，UI 可以显示提示
+
+---
+
+## 25. 事务机制（Transaction）
+
+**文件：** [interaction/CommandManager.ts](packages/graphite/src/interaction/CommandManager.ts)
+
+### 25.1 问题
+
+默认情况下，`paste()` 粘贴 5 个节点 + 3 条边，需要按 8 次 Ctrl+Z 才能完全撤销。这不是用户期望的行为。
+
+### 25.2 CompoundCommand
+
+```typescript
+class CompoundCommand implements ICommand {
+  constructor(private commands: ICommand[], readonly label: string) {}
+  execute() { this.commands.forEach(c => c.execute()) }
+  undo()    { [...this.commands].reverse().forEach(c => c.undo()) }
+}
+```
+
+多条命令捆绑为一条历史记录。注意 `undo()` 要**逆序**执行，确保正确撤销依赖关系。
+
+### 25.3 事务 API
+
+```typescript
+// CommandManager 内部
+private transactionDepth = 0
+private pendingCommands: ICommand[] = []
+
+beginTransaction() { this.transactionDepth++ }
+commitTransaction() {
+  if (--this.transactionDepth === 0) {
+    const compound = new CompoundCommand(this.pendingCommands, label)
+    this._addToHistory(compound)
+    this.pendingCommands = []
+  }
+}
+
+execute(cmd: ICommand) {
+  cmd.execute()
+  if (this.transactionDepth > 0) {
+    this.pendingCommands.push(cmd)  // 事务中：暂存
+  } else {
+    this._addToHistory(cmd)          // 普通：直接入栈
+  }
+}
+```
+
+支持嵌套事务（`transactionDepth` 计数器），只有最外层 `commitTransaction` 才写入历史。
+
+---
+
+## 26. 序列化完整化（JSON v2）
+
+**文件：** [GraphiteEditor.ts](packages/graphite/src/GraphiteEditor.ts)
+
+### 26.1 问题
+
+早期版本只序列化普通 `Node`，`CustomNode`（nodeType/data）、`ImageNode`（imageData）、折点（waypoints）、端口（ports）等都丢失了，reload 后画面面目全非。
+
+### 26.2 exportToJSON 结构（v2）
+
+```typescript
+{
+  version: 2,
+  nodes: [{
+    id, x, y, width, height, content, shape,
+    style,           // 含 fontFamily, strokeGradient
+    ports,           // PortDefinition[]
+    nodeType,        // CustomNode 专有
+    data,            // CustomNode 专有（Proxy 解包为普通对象）
+    imageData,       // ImageNode 专有（base64 data URL）
+  }],
+  edges: [{
+    id, from, to,
+    style,           // 含 dashPreset
+    waypoints,       // Point[]
+    label,
+  }]
+}
+```
+
+### 26.3 importFromJSON 路由
+
+```typescript
+if (nodeData.imageData) {
+  node = this.createImageNode(nodeData)      // ImageNode
+} else if (nodeData.nodeType) {
+  node = this.createCustomNode(nodeData)     // CustomNode
+} else {
+  node = this.createNode(nodeData)           // 普通 Node
+}
+node.id = nodeData.id  // 恢复原始 id（createXxx 会生成新 id）
+```
+
+---
+
+## 27. UI 层：Playground（Vue 应用）
 
 **文件：** [apps/playground/src/App.vue](apps/playground/src/App.vue)
 
@@ -1352,7 +1632,7 @@ UI 功能清单：
 
 ---
 
-## 22. 构建一个图形编辑器的完整路径
+## 28. 构建一个图形编辑器的完整路径
 
 如果你要从零开始构建一个类似的图形编辑器，建议按以下顺序实现：
 
@@ -1420,6 +1700,14 @@ UI 功能清单：
 42. 动态侧边栏（从 registry 读取并渲染）
 43. 内置富节点类型（表格、进度条、仪表盘等）
 
+### 阶段八：工程化增强（2-3 天）
+
+44. `CompoundCommand` + `beginTransaction/commitTransaction`（批量原子撤销）
+45. `PortDefinition`（归一化坐标的可配置连接点）
+46. `ConnectionValidator`（命名规则注册表 + 内置规则）
+47. 样式系统增强（fontFamily、strokeGradient、dashPreset）
+48. JSON v2 序列化（保存/恢复 shape、ports、nodeType、data、imageData、waypoints）
+
 ### 常见坑和注意事项
 
 - **坐标系**：始终区分屏幕坐标和世界坐标，每次鼠标事件都要先转换
@@ -1432,6 +1720,10 @@ UI 功能清单：
 - **文本编辑光标对齐**：textarea 的 `fontSize`、`fontWeight`、`textAlign` 必须与 canvas 渲染完全一致
 - **自定义节点坐标系**：render 函数的 `bounds` 是本地坐标（左上角为原点），不是中心坐标
 - **响应式数据**：使用 Proxy 拦截 `data` 变化，自动触发重绘，避免手动 `markDirty()`
+- **可拖动折点**：首次拖拽时才将自动路径复制为手动 waypoints（initialize-on-first-drag 模式）
+- **端口归一化坐标**：`dx/dy` 范围 ±0.5，节点缩放后端口自动跟随，无需重新计算像素位置
+- **渐变边框**：Canvas 的 `strokeStyle` 可以接受 `CanvasGradient` 对象，不只是颜色字符串
+- **事务嵌套**：`transactionDepth` 计数器保证只有最外层 commit 才写入历史，内层 commit 只是计数
 
 ---
 
