@@ -2,6 +2,29 @@ import type { ICommand, Point } from '../types'
 import type { Node } from '../core/Node'
 import type { Edge } from '../core/Edge'
 
+// 移动折点命令（正交折线的用户拖拽折点）
+export class MoveWaypointCommand implements ICommand {
+  private edge: Edge
+  private index: number
+  private oldPoint: Point
+  private newPoint: Point
+
+  constructor(edge: Edge, index: number, oldPoint: Point, newPoint: Point) {
+    this.edge = edge
+    this.index = index
+    this.oldPoint = { ...oldPoint }
+    this.newPoint = { ...newPoint }
+  }
+
+  execute(): void {
+    this.edge.waypoints[this.index] = { ...this.newPoint }
+  }
+
+  undo(): void {
+    this.edge.waypoints[this.index] = { ...this.oldPoint }
+  }
+}
+
 // 移动命令
 export class MoveCommand implements ICommand {
   private nodes: Node[]

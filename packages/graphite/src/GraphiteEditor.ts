@@ -14,6 +14,7 @@ import { Minimap } from './ui/Minimap'
 import { SnapGuide } from './utils/SnapGuide'
 import {
   MoveCommand,
+  MoveWaypointCommand,
   CreateNodeCommand,
   DeleteNodeCommand,
   CreateEdgeCommand,
@@ -69,6 +70,12 @@ export class GraphiteEditor extends EventEmitter {
   private resizeStartPoint: Point | null = null
   private resizeStartSize: { width: number; height: number } | null = null
   private resizeStartPosition: Point | null = null
+
+  // 折点（Waypoint）拖拽状态
+  private isDraggingWaypoint: boolean = false
+  private waypointEdge: Edge | null = null
+  private waypointIndex: number = -1           // index in edge.waypoints[]
+  private waypointStartPos: Point | null = null // position before drag
 
   // 悬浮状态
   private hoveredNode: Node | null = null
@@ -248,6 +255,27 @@ export class GraphiteEditor extends EventEmitter {
         const selectedNodes = this.selectionManager.getSelectedNodes()
         this.dragManager.startDrag(selectedNodes, worldPoint)
       } else {
+        // 检查已选中边的折点拖拽柄（优先于点击新边）
+        const selectedEdges = this.selectionManager.getSelectedEdges()
+        let hitWaypoint = false
+        for (const edge of selectedEdges) {
+          const hit = this.hitTestWaypointHandle(edge, worldPoint)
+          if (hit !== null) {
+            // 初始化 waypoints（首次拖拽时从 points 推导）
+            if (edge.waypoints.length === 0 && edge.points.length > 2) {
+              edge.waypoints = edge.points.slice(1, -1).map(p => ({ ...p }))
+            }
+            this.isDraggingWaypoint = true
+            this.waypointEdge = edge
+            this.waypointIndex = hit
+            this.waypointStartPos = { ...edge.waypoints[hit] }
+            this.canvas.style.cursor = 'move'
+            hitWaypoint = true
+            break
+          }
+        }
+        if (hitWaypoint) return
+
         // 检查是否点击了连线
         const clickedEdge = this.findEdgeAt(worldPoint)
 
@@ -281,6 +309,34 @@ export class GraphiteEditor extends EventEmitter {
     return null
   }
 
+  /**
+   * Returns the waypoints[] index that was hit, or null.
+   * The visible handles are placed at each waypoint (or at interior points
+   * of the auto-computed path when waypoints is still empty).
+   */
+  private hitTestWaypointHandle(edge: Edge, point: Point): number | null {
+    const handles = this.getWaypointHandlePositions(edge)
+    const radius = 8 / this.renderer.getCamera().zoom
+    for (let i = 0; i < handles.length; i++) {
+      const dx = point.x - handles[i].x
+      const dy = point.y - handles[i].y
+      if (dx * dx + dy * dy <= radius * radius) return i
+    }
+    return null
+  }
+
+  /**
+   * Returns the world positions of the draggable waypoint handles.
+   * Prefers edge.waypoints when set; falls back to interior points in
+   * the auto-computed edge.points so you can start dragging immediately.
+   */
+  private getWaypointHandlePositions(edge: Edge): Point[] {
+    if (edge.waypoints.length > 0) return edge.waypoints
+    // Expose interior auto-computed points as virtual handles
+    if (edge.points.length > 2) return edge.points.slice(1, -1)
+    return []
+  }
+
   // 鼠标移动
   private onMouseMove(e: MouseEvent): void {
     const point = this.getMousePosition(e)
@@ -300,6 +356,14 @@ export class GraphiteEditor extends EventEmitter {
       const dy = point.y - this.panStartPoint.y
       this.renderer.getCamera().translate(dx, dy)
       this.panStartPoint = point
+      this.renderer.markDirty()
+      return
+    }
+
+    // 折点拖拽
+    if (this.isDraggingWaypoint && this.waypointEdge && this.waypointIndex >= 0) {
+      this.waypointEdge.waypoints[this.waypointIndex] = { ...worldPoint }
+      this.updateEdges()
       this.renderer.markDirty()
       return
     }
@@ -434,6 +498,19 @@ export class GraphiteEditor extends EventEmitter {
       this.currentPath = null
       this.canvas.style.cursor = this.isPencilMode ? 'crosshair' : 'default'
       this.renderer.markDirty()
+      return
+    }
+
+    // 结束折点拖拽
+    if (this.isDraggingWaypoint && this.waypointEdge && this.waypointStartPos) {
+      const newPos = { ...this.waypointEdge.waypoints[this.waypointIndex] }
+      const cmd = new MoveWaypointCommand(this.waypointEdge, this.waypointIndex, this.waypointStartPos, newPos)
+      this.commandManager.addToHistory(cmd)
+      this.isDraggingWaypoint = false
+      this.waypointEdge = null
+      this.waypointIndex = -1
+      this.waypointStartPos = null
+      this.canvas.style.cursor = 'default'
       return
     }
 
@@ -1283,6 +1360,23 @@ export class GraphiteEditor extends EventEmitter {
       ctx.stroke()
 
       ctx.setLineDash([])
+
+      // 绘制折点拖拽控制点（菱形）
+      const handles = this.getWaypointHandlePositions(edge)
+      const r = 5 / camera.zoom
+      ctx.fillStyle = '#ffffff'
+      ctx.strokeStyle = '#4A90E2'
+      ctx.lineWidth = 1.5 / camera.zoom
+      handles.forEach(h => {
+        ctx.beginPath()
+        ctx.moveTo(h.x, h.y - r)
+        ctx.lineTo(h.x + r, h.y)
+        ctx.lineTo(h.x, h.y + r)
+        ctx.lineTo(h.x - r, h.y)
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+      })
     })
 
     ctx.restore()

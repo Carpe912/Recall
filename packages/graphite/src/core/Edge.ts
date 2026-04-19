@@ -331,6 +331,12 @@ export class Edge extends GraphicObject {
     // 根据线条样式生成路径点
     const lineStyle = this.style.lineStyle || 'straight'
 
+    // 如果用户设置了手动折点（waypoints），直接使用，跳过自动路由
+    if (this.waypoints.length > 0) {
+      this.points = [start, ...this.waypoints.map(p => ({ ...p })), end]
+      return
+    }
+
     if (lineStyle === 'orthogonal') {
       // 正交线：检查是否使用智能路由
       if (this.style.useSmartRouting) {
