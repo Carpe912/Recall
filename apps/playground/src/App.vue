@@ -76,7 +76,7 @@
       <!-- 左侧形状面板 -->
       <div class="shapes-panel" :class="{ collapsed: shapesPanelCollapsed }" :style="{ width: shapesPanelWidth + 'px' }">
         <div class="panel-header">
-          <span>形状</span>
+          <span v-show="!shapesPanelCollapsed">形状</span>
           <button class="collapse-btn" @click="shapesPanelCollapsed = !shapesPanelCollapsed">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline :points="shapesPanelCollapsed ? '9 18 15 12 9 6' : '15 18 9 12 15 6'"/>
@@ -787,6 +787,11 @@ function resetZoom() {
   flex-shrink: 0;
 }
 
+.shapes-panel.collapsed .panel-header {
+  justify-content: center;
+  padding: 0;
+}
+
 .collapse-btn {
   width: 24px;
   height: 24px;
@@ -929,88 +934,175 @@ function resetZoom() {
   position: absolute;
   top: 0;
   right: 0;
-  width: 240px;
+  width: 280px;
   height: 100%;
-  background: rgba(250, 250, 250, 0.96);
-  border-left: 1px solid #e5e5e5;
-  padding: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 0;
   overflow-y: auto;
   z-index: 50;
   box-sizing: border-box;
+  box-shadow: -2px 0 16px rgba(0, 0, 0, 0.06);
+}
+
+.sidebar > div {
+  padding: 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sidebar > div:last-child {
+  border-bottom: none;
 }
 
 .sidebar h3 {
-  margin: 0 0 16px 0;
-  font-size: 13px;
+  margin: 0 0 20px 0;
+  font-size: 14px;
   font-weight: 600;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.style-control {
-  margin-bottom: 16px;
-}
-
-.style-control label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: #666;
-}
-
-.style-control input[type="color"] {
-  width: 100%;
-  height: 32px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.style-control input[type="range"] {
-  width: calc(100% - 44px);
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.style-control span {
-  font-size: 11px;
-  color: #888;
-  min-width: 36px;
-  display: inline-block;
-}
-
-.style-select {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #666;
-  background: white;
-  cursor: pointer;
-  outline: none;
-}
-
-.style-select:hover {
-  border-color: #1976d2;
-}
-
-.checkbox-wrapper {
+  color: #333;
+  letter-spacing: -0.01em;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.checkbox-wrapper input[type="checkbox"] {
+.sidebar h3::before {
+  content: '';
+  width: 3px;
+  height: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
+}
+
+.style-control {
+  margin-bottom: 20px;
+}
+
+.style-control:last-child {
+  margin-bottom: 0;
+}
+
+.style-control label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  letter-spacing: 0.01em;
+}
+
+.style-control input[type="color"] {
+  width: 100%;
+  height: 40px;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.style-control input[type="color"]:hover {
+  border-color: #667eea;
+}
+
+.style-control input[type="range"] {
+  width: calc(100% - 50px);
+  margin-right: 10px;
+  vertical-align: middle;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #e8e8e8 0%, #e8e8e8 100%);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.style-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
   width: 16px;
   height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s;
+}
+
+.style-control input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.style-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s;
+}
+
+.style-control input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
+.style-control span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #667eea;
+  min-width: 40px;
+  display: inline-block;
+  text-align: right;
+}
+
+.style-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #333;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.style-select:hover {
+  border-color: #667eea;
+}
+
+.style-select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.checkbox-wrapper:hover {
+  background: #f0f1f3;
+}
+
+.checkbox-wrapper input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #667eea;
 }
 
 .checkbox-wrapper span {
-  font-size: 12px;
-  color: #666;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
 }
 
 /* 浮动工具栏 */
