@@ -1,5 +1,4 @@
 import type { Node } from '../core/Node'
-import type { Point } from '../types'
 
 export interface SnapResult {
   x: number
@@ -29,6 +28,10 @@ export class SnapGuide {
 
   setEnableNodeSnap(enable: boolean): void {
     this.enableNodeSnap = enable
+  }
+
+  getGridSize(): number {
+    return this.gridSize
   }
 
   // 计算吸附位置
@@ -61,20 +64,10 @@ export class SnapGuide {
     let snapX: number | null = null
     let snapY: number | null = null
 
-    // 网格吸附
+    // 网格吸附：始终对齐到最近格点，不显示辅助线
     if (this.enableGrid && this.gridSize > 0) {
-      const gridSnapX = Math.round(targetX / this.gridSize) * this.gridSize
-      const gridSnapY = Math.round(targetY / this.gridSize) * this.gridSize
-
-      if (Math.abs(targetX - gridSnapX) < threshold) {
-        snapX = gridSnapX
-        result.guides.x.push(gridSnapX)
-      }
-
-      if (Math.abs(targetY - gridSnapY) < threshold) {
-        snapY = gridSnapY
-        result.guides.y.push(gridSnapY)
-      }
+      snapX = Math.round(targetX / this.gridSize) * this.gridSize
+      snapY = Math.round(targetY / this.gridSize) * this.gridSize
     }
 
     // 节点吸附

@@ -336,7 +336,10 @@ export class GraphiteEditor extends EventEmitter {
         this.dragManager.drag(worldPoint, { x: snapResult.x, y: snapResult.y })
         this.snapGuides = snapResult.snappedX || snapResult.snappedY ? snapResult.guides : { x: [], y: [] }
       } else {
-        this.dragManager.drag(worldPoint)
+        const gridSize = this.snapGuide.getGridSize()
+        const snapX = Math.round(worldPoint.x / gridSize) * gridSize
+        const snapY = Math.round(worldPoint.y / gridSize) * gridSize
+        this.dragManager.drag(worldPoint, { x: snapX, y: snapY })
         this.snapGuides = { x: [], y: [] }
       }
 

@@ -509,15 +509,19 @@ function ungroupSelected() { editor?.ungroupSelected() }
   background: #fff;
 }
 
-/* 右侧样式面板 */
+/* 右侧样式面板：绝对定位覆盖画布，不参与 flex 布局，避免 canvas 宽度变化触发 ResizeObserver 重绘 */
 .sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
   width: 240px;
-  min-width: 240px;
-  flex-shrink: 0;
-  background: #fafafa;
+  height: 100%;
+  background: rgba(250, 250, 250, 0.96);
   border-left: 1px solid #e5e5e5;
   padding: 16px;
   overflow-y: auto;
+  z-index: 50;
+  box-sizing: border-box;
 }
 
 .sidebar h3 {
