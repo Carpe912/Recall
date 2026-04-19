@@ -17,7 +17,7 @@ export { Camera } from './renderer/Camera'
 // 交互系统
 export { SelectionManager } from './interaction/SelectionManager'
 export { DragManager } from './interaction/DragManager'
-export { CommandManager } from './interaction/CommandManager'
+export { CommandManager, CompoundCommand } from './interaction/CommandManager'
 
 // 工具
 export { EventEmitter } from './utils/EventEmitter'

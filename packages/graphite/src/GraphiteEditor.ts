@@ -3,7 +3,7 @@ import { Edge } from './core/Edge'
 import { Group } from './core/Group'
 import { ImageNode } from './core/ImageNode'
 import { Path } from './core/Path'
-import { CustomNode, type CustomNodeData, type CustomRenderFunction } from './core/CustomNode'
+import { CustomNode, type CustomNodeData } from './core/CustomNode'
 import { NodeRegistry, type NodeTypeDefinition } from './core/NodeRegistry'
 import { Renderer } from './renderer/Renderer'
 import { SelectionManager } from './interaction/SelectionManager'
@@ -1446,7 +1446,11 @@ export class GraphiteEditor extends EventEmitter {
     const selectedNodes = this.selectionManager.getSelectedNodes()
     const selectedEdges = this.selectionManager.getSelectedEdges()
 
-    // 删除节点
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return
+
+    this.commandManager.beginTransaction('delete')
+
+    // 删除节点及其关联边
     selectedNodes.forEach(node => {
       const command = new DeleteNodeCommand(node, this.nodes)
       this.commandManager.execute(command)
@@ -1466,6 +1470,8 @@ export class GraphiteEditor extends EventEmitter {
       const command = new DeleteEdgeCommand(edge, this.edges)
       this.commandManager.execute(command)
     })
+
+    this.commandManager.commitTransaction()
 
     this.selectionManager.clear()
     this.renderer.markDirty()
@@ -1580,6 +1586,8 @@ export class GraphiteEditor extends EventEmitter {
     const offset = 30
     const newNodes: Node[] = []
 
+    this.commandManager.beginTransaction('paste')
+
     this.clipboard.nodes.forEach(node => {
       const clonedNode = node.clone()
       const oldId = node.id
@@ -1624,6 +1632,8 @@ export class GraphiteEditor extends EventEmitter {
       const command = new CreateEdgeCommand(clonedEdge, this.edges)
       this.commandManager.execute(command)
     })
+
+    this.commandManager.commitTransaction()
 
     this.updateEdges()
     this.renderer.markDirty()
@@ -1835,6 +1845,30 @@ export class GraphiteEditor extends EventEmitter {
 
   getDefaultEdgeStyle(): Partial<EdgeStyle> {
     return this.defaultEdgeStyle
+  }
+
+  // ---- 事务 API ----
+  /**
+   * 开始一个事务。事务内所有命令会被捆绑为一条历史记录，
+   * 使 Ctrl+Z 一次撤销整个操作（如粘贴、批量删除）。
+   * 支持嵌套：只有最外层 commit 才会刷入历史。
+   */
+  beginTransaction(label: string = ''): void {
+    this.commandManager.beginTransaction(label)
+  }
+
+  /** 提交事务，将批量命令作为一条记录写入撤销历史。 */
+  commitTransaction(): void {
+    this.commandManager.commitTransaction()
+    this.updateEdges()
+    this.renderer.markDirty()
+  }
+
+  /** 回滚事务：撤销已执行的命令并丢弃批次，不写入历史。 */
+  rollbackTransaction(): void {
+    this.commandManager.rollbackTransaction()
+    this.updateEdges()
+    this.renderer.markDirty()
   }
 
   // 销毁
