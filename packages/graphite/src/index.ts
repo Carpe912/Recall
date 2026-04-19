@@ -38,6 +38,7 @@ export type {
   NodeStyle,
   EdgeData,
   EdgeStyle,
+  DashPreset,
   PortData,
   PortDefinition,
   IGraphicObject,

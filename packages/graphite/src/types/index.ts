@@ -52,12 +52,15 @@ export interface NodeStyle {
   borderRadius?: number
   fontSize?: number
   fontColor?: string
+  fontFamily?: string
   shadowBlur?: number
   shadowColor?: string
   shadowOffsetX?: number
   shadowOffsetY?: number
   opacity?: number
   shape?: 'rectangle' | 'circle' | 'diamond' | 'triangle'
+  /** Gradient border: two colors for a linear gradient stroke, e.g. ['#ff0000', '#0000ff'] */
+  strokeGradient?: [string, string]
 }
 
 export interface EdgeData {
@@ -69,10 +72,22 @@ export interface EdgeData {
   style?: EdgeStyle
 }
 
+/**
+ * Preset dash patterns for edges.
+ * 'solid'     — no dash (default)
+ * 'dashed'    — standard dash  [8, 4]
+ * 'dotted'    — dots           [2, 4]
+ * 'long-dash' — long dash      [16, 6]
+ * 'dot-dash'  — dot-dash       [8, 4, 2, 4]
+ */
+export type DashPreset = 'solid' | 'dashed' | 'dotted' | 'long-dash' | 'dot-dash'
+
 export interface EdgeStyle {
   stroke?: string
   strokeWidth?: number
   strokeDasharray?: string
+  /** Named dash preset (takes priority over strokeDasharray when set) */
+  dashPreset?: DashPreset
   arrowType?: 'arrow' | 'circle' | 'diamond' | 'none'
   arrowSize?: number
   opacity?: number

@@ -1,6 +1,5 @@
 import { GraphicObject } from './GraphicObject'
 import type { NodeData, NodeStyle, PortDefinition, Rect, Point } from '../types'
-
 /** Default 4-port layout (top / right / bottom / left) */
 const DEFAULT_PORTS: PortDefinition[] = [
   { id: 'top',    dx: 0,    dy: -0.5, type: 'both' },
@@ -14,7 +13,7 @@ export class Node extends GraphicObject {
   height: number
   content: string
   shape: 'rectangle' | 'circle' | 'diamond' | 'triangle'
-  style: Required<NodeStyle>
+  style: Omit<Required<NodeStyle>, 'strokeGradient'> & Pick<NodeStyle, 'strokeGradient'>
   /** Configurable port list — defaults to 4 standard ports */
   ports: PortDefinition[]
 
@@ -36,12 +35,14 @@ export class Node extends GraphicObject {
       borderRadius: data.style?.borderRadius || 8,
       fontSize: data.style?.fontSize || 14,
       fontColor: data.style?.fontColor || '#333333',
+      fontFamily: data.style?.fontFamily || 'sans-serif',
       shadowBlur: data.style?.shadowBlur || 0,
       shadowColor: data.style?.shadowColor || 'rgba(0, 0, 0, 0.2)',
       shadowOffsetX: data.style?.shadowOffsetX || 0,
       shadowOffsetY: data.style?.shadowOffsetY || 0,
       opacity: data.style?.opacity || 1,
       shape: data.style?.shape || this.shape,
+      strokeGradient: data.style?.strokeGradient,
     }
   }
 
@@ -90,14 +91,22 @@ export class Node extends GraphicObject {
     ctx.fillStyle = this.style.fill
     ctx.fill()
 
-    // 描边
-    ctx.strokeStyle = this.style.stroke
+    // 描边（支持渐变色）
+    if (this.style.strokeGradient) {
+      const [c1, c2] = this.style.strokeGradient
+      const grad = ctx.createLinearGradient(-this.width / 2, 0, this.width / 2, 0)
+      grad.addColorStop(0, c1)
+      grad.addColorStop(1, c2)
+      ctx.strokeStyle = grad
+    } else {
+      ctx.strokeStyle = this.style.stroke
+    }
     ctx.lineWidth = this.style.strokeWidth
     ctx.stroke()
 
     // 绘制文本
     ctx.fillStyle = this.style.fontColor
-    ctx.font = `${this.style.fontSize}px sans-serif`
+    ctx.font = `${this.style.fontSize}px ${this.style.fontFamily}`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(this.content, 0, 0)

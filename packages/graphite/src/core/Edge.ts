@@ -1,8 +1,17 @@
 import { GraphicObject } from './GraphicObject'
-import type { EdgeData, EdgeStyle, Rect, Point } from '../types'
+import type { EdgeData, EdgeStyle, DashPreset, Rect, Point } from '../types'
 import type { Node } from './Node'
 import { pointToLineDistance, drawArrow } from '../utils/geometry'
 import { PathfindingRouter } from '../utils/PathfindingRouter'
+
+/** Maps named presets to [dash, gap, ...] arrays */
+const DASH_PRESETS: Record<DashPreset, number[]> = {
+  'solid':     [],
+  'dashed':    [8, 4],
+  'dotted':    [2, 4],
+  'long-dash': [16, 6],
+  'dot-dash':  [8, 4, 2, 4],
+}
 
 export class Edge extends GraphicObject {
   fromNodeId: string
@@ -10,7 +19,7 @@ export class Edge extends GraphicObject {
   fromNode: Node | null = null
   toNode: Node | null = null
   points: Point[] = []
-  style: Required<EdgeStyle>
+  style: Omit<Required<EdgeStyle>, 'dashPreset'> & Pick<EdgeStyle, 'dashPreset'>
 
   /** User-defined text label drawn at the midpoint of the edge. */
   label: string = ''
@@ -34,6 +43,7 @@ export class Edge extends GraphicObject {
       stroke: data.style?.stroke || '#666666',
       strokeWidth: data.style?.strokeWidth || 2,
       strokeDasharray: data.style?.strokeDasharray || '',
+      dashPreset: data.style?.dashPreset,
       arrowType: data.style?.arrowType || 'arrow',
       arrowSize: data.style?.arrowSize || 10,
       opacity: data.style?.opacity || 1,
@@ -53,7 +63,10 @@ export class Edge extends GraphicObject {
     ctx.strokeStyle = this.style.stroke
     ctx.lineWidth = this.style.strokeWidth
 
-    if (this.style.strokeDasharray) {
+    // Dash preset takes priority over raw strokeDasharray
+    if (this.style.dashPreset) {
+      ctx.setLineDash(DASH_PRESETS[this.style.dashPreset])
+    } else if (this.style.strokeDasharray) {
       const dashArray = this.style.strokeDasharray.split(',').map(Number)
       ctx.setLineDash(dashArray)
     }
