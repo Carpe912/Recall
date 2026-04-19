@@ -12,10 +12,22 @@ export class Edge extends GraphicObject {
   points: Point[] = []
   style: Required<EdgeStyle>
 
+  /** User-defined text label drawn at the midpoint of the edge. */
+  label: string = ''
+
+  /**
+   * User-defined intermediate control points (world coordinates).
+   * When set, the edge uses these fixed points instead of auto-calculating
+   * an orthogonal path. Used by the waypoint-drag feature.
+   */
+  waypoints: Point[] = []
+
   constructor(data: EdgeData) {
     super('edge', data.id)
     this.fromNodeId = data.from
     this.toNodeId = data.to
+    if (data.label) this.label = data.label
+    if (data.waypoints) this.waypoints = data.waypoints.map(p => ({ ...p }))
 
     // 默认样式
     this.style = {
@@ -233,6 +245,8 @@ export class Edge extends GraphicObject {
     const edge = new Edge({
       from: this.fromNodeId,
       to: this.toNodeId,
+      label: this.label,
+      waypoints: this.waypoints.map(p => ({ ...p })),
       style: { ...this.style },
     })
     edge.points = this.points.map(p => ({ ...p }))

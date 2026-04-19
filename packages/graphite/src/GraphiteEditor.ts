@@ -1889,27 +1889,39 @@ export class GraphiteEditor extends EventEmitter {
   // 导出为 JSON
   exportToJSON(): string {
     const data = {
+      version: 2,
       nodes: this.nodes.map(node => {
-        const baseData: any = {
+        const base: any = {
           id: node.id,
           x: node.transform.x,
           y: node.transform.y,
           width: node.width,
           height: node.height,
           content: node.content,
-          style: node.style,
+          shape: node.shape,
+          style: { ...node.style },
         }
-        // 如果是图片节点，添加 imageData
+        // CustomNode: save nodeType + reactive data
+        if (node instanceof CustomNode) {
+          base.nodeType = node.nodeType
+          // Proxy unwrap: spread to plain object
+          base.data = { ...node.data }
+        }
+        // ImageNode: save imageData
         if (node instanceof ImageNode) {
-          baseData.imageData = node.imageData
+          base.imageData = node.imageData
         }
-        return baseData
+        return base
       }),
       edges: this.edges.map(edge => ({
         id: edge.id,
         from: edge.fromNodeId,
         to: edge.toNodeId,
-        style: edge.style,
+        style: { ...edge.style },
+        // waypoints: user-defined intermediate points (empty array for now,
+        // populated once the waypoint-drag feature is active)
+        waypoints: edge.waypoints ?? [],
+        label: edge.label ?? '',
       })),
     }
     return JSON.stringify(data, null, 2)
@@ -1925,21 +1937,55 @@ export class GraphiteEditor extends EventEmitter {
 
       // 导入节点
       const nodeMap = new Map<string, Node>()
-      data.nodes?.forEach((nodeData: any) => {
+      ;(data.nodes ?? []).forEach((nodeData: any) => {
         let node: Node
         if (nodeData.imageData) {
-          // 创建图片节点
           node = this.createImageNode(nodeData)
+        } else if (nodeData.nodeType) {
+          // CustomNode
+          node = this.createCustomNode({
+            id: nodeData.id,
+            x: nodeData.x,
+            y: nodeData.y,
+            width: nodeData.width,
+            height: nodeData.height,
+            content: nodeData.content ?? '',
+            nodeType: nodeData.nodeType,
+            data: nodeData.data ?? {},
+            style: nodeData.style,
+          })
         } else {
-          // 创建普通节点
-          node = this.createNode(nodeData)
+          node = this.createNode({
+            id: nodeData.id,
+            x: nodeData.x,
+            y: nodeData.y,
+            width: nodeData.width,
+            height: nodeData.height,
+            content: nodeData.content,
+            shape: nodeData.shape,
+            style: nodeData.style,
+          })
         }
+        // Restore the original id (createNode generates a new one)
+        node.id = nodeData.id
         nodeMap.set(nodeData.id, node)
       })
 
       // 导入边
-      data.edges?.forEach((edgeData: any) => {
-        this.createEdge(edgeData)
+      ;(data.edges ?? []).forEach((edgeData: any) => {
+        const edge = this.createEdge({
+          id: edgeData.id,
+          from: edgeData.from,
+          to: edgeData.to,
+          style: edgeData.style,
+        })
+        // Restore waypoints and label if present
+        if (Array.isArray(edgeData.waypoints)) {
+          edge.waypoints = edgeData.waypoints
+        }
+        if (edgeData.label !== undefined) {
+          edge.label = edgeData.label
+        }
       })
 
       this.renderer.markDirty()

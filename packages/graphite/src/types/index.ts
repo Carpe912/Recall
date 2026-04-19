@@ -50,6 +50,8 @@ export interface EdgeData {
   id?: string
   from: string
   to: string
+  label?: string
+  waypoints?: Point[]
   style?: EdgeStyle
 }
 
