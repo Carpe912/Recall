@@ -7,6 +7,8 @@ export { Edge } from './core/Edge'
 export { Group } from './core/Group'
 export { Port } from './core/Port'
 export { GraphicObject } from './core/GraphicObject'
+export { CustomNode } from './core/CustomNode'
+export { NodeRegistry } from './core/NodeRegistry'
 
 // 渲染系统
 export { Renderer } from './renderer/Renderer'
@@ -42,3 +44,5 @@ export type {
   LayoutOptions,
 } from './types'
 export type { LayoutOptions as LayoutEngineOptions } from './utils/LayoutEngine'
+export type { CustomNodeData, RenderContext, CustomRenderFunction } from './core/CustomNode'
+export type { NodeTypeDefinition, EditableConfig } from './core/NodeRegistry'

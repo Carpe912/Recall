@@ -86,29 +86,68 @@
         <div class="shapes-content" v-show="!shapesPanelCollapsed">
           <div class="shape-category">
             <div class="category-title">基础形状</div>
-            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'rectangle')">
-              <svg width="40" height="40" viewBox="0 0 40 40">
-                <rect x="5" y="10" width="30" height="20" rx="2" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
-              </svg>
-              <span>矩形</span>
+            <div class="shape-grid">
+              <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'rectangle')">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                  <rect x="5" y="10" width="30" height="20" rx="2" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+                </svg>
+                <span>矩形</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'circle')">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="12" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+                </svg>
+                <span>圆形</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'diamond')">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                  <path d="M 20 8 L 32 20 L 20 32 L 8 20 Z" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+                </svg>
+                <span>菱形</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'triangle')">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                  <path d="M 20 8 L 32 28 L 8 28 Z" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+                </svg>
+                <span>三角形</span>
+              </div>
             </div>
-            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'circle')">
-              <svg width="40" height="40" viewBox="0 0 40 40">
-                <circle cx="20" cy="20" r="12" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
-              </svg>
-              <span>圆形</span>
-            </div>
-            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'diamond')">
-              <svg width="40" height="40" viewBox="0 0 40 40">
-                <path d="M 20 8 L 32 20 L 20 32 L 8 20 Z" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
-              </svg>
-              <span>菱形</span>
-            </div>
-            <div class="shape-item" draggable="true" @dragstart="onShapeDragStart($event, 'triangle')">
-              <svg width="40" height="40" viewBox="0 0 40 40">
-                <path d="M 20 8 L 32 28 L 8 28 Z" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
-              </svg>
-              <span>三角形</span>
+          </div>
+          <div class="shape-category">
+            <div class="category-title">复杂图形</div>
+            <div class="shape-grid">
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'table')">
+                <div class="custom-node-preview">📊</div>
+                <span>表格</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'progress')">
+                <div class="custom-node-preview">📈</div>
+                <span>进度条</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'card')">
+                <div class="custom-node-preview">💳</div>
+                <span>卡片</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'gauge')">
+                <div class="custom-node-preview">⏱️</div>
+                <span>仪表盘</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'user-card')">
+                <div class="custom-node-preview">👤</div>
+                <span>用户卡片</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'image-card')">
+                <div class="custom-node-preview">🖼️</div>
+                <span>图片卡片</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'timeline')">
+                <div class="custom-node-preview">⏰</div>
+                <span>时间轴</span>
+              </div>
+              <div class="shape-item" draggable="true" @dragstart="onCustomNodeDragStart($event, 'stat-card')">
+                <div class="custom-node-preview">📊</div>
+                <span>统计卡片</span>
+              </div>
             </div>
           </div>
           <div class="shape-category">
@@ -425,6 +464,7 @@ const isResizingPanel = ref(false)
 const resizeStartX = ref(0)
 const resizeStartWidth = ref(0)
 let draggedShape: 'rectangle' | 'circle' | 'diamond' | 'triangle' | null = null
+let draggedCustomNodeType: string | null = null
 
 const nodeStyle = ref({
   fill: '#ffffff',
@@ -531,7 +571,7 @@ function onCanvasDragOver(e: DragEvent) {
 
 function onCanvasDrop(e: DragEvent) {
   e.preventDefault()
-  if (!editor || !draggedShape || !canvasRef.value) return
+  if (!editor || !canvasRef.value) return
 
   const rect = canvasRef.value.getBoundingClientRect()
   const x = e.clientX - rect.left
@@ -541,22 +581,45 @@ function onCanvasDrop(e: DragEvent) {
   const camera = editor['renderer'].getCamera()
   const worldPoint = camera.screenToWorld({ x, y })
 
-  // 创建节点
-  editor.createNode({
-    x: worldPoint.x,
-    y: worldPoint.y,
-    width: 120,
-    height: 80,
-    content: `${draggedShape.charAt(0).toUpperCase() + draggedShape.slice(1)}`,
-    shape: draggedShape
-  })
+  // 创建自定义节点
+  if (draggedCustomNodeType) {
+    editor.createCustomNode({
+      x: worldPoint.x,
+      y: worldPoint.y,
+      nodeType: draggedCustomNodeType,
+      content: ''
+    })
+    draggedCustomNodeType = null
+    return
+  }
 
-  draggedShape = null
+  // 创建基础节点
+  if (draggedShape) {
+    editor.createNode({
+      x: worldPoint.x,
+      y: worldPoint.y,
+      width: 120,
+      height: 80,
+      content: `${draggedShape.charAt(0).toUpperCase() + draggedShape.slice(1)}`,
+      shape: draggedShape
+    })
+    draggedShape = null
+  }
 }
 
 // 形状拖拽开始
 function onShapeDragStart(e: DragEvent, shape: 'rectangle' | 'circle' | 'diamond' | 'triangle') {
   draggedShape = shape
+  draggedCustomNodeType = null
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+}
+
+// 自定义节点拖拽开始
+function onCustomNodeDragStart(e: DragEvent, nodeType: string) {
+  draggedCustomNodeType = nodeType
+  draggedShape = null
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'copy'
   }
@@ -830,12 +893,17 @@ function resetZoom() {
   margin-bottom: 10px;
 }
 
+.shape-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
 .shape-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 12px 8px;
-  margin-bottom: 8px;
   border: 1px solid #e5e5e5;
   border-radius: 6px;
   cursor: grab;
@@ -858,6 +926,16 @@ function resetZoom() {
   margin-top: 6px;
   font-size: 11px;
   color: #666;
+  text-align: center;
+}
+
+.custom-node-preview {
+  font-size: 32px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .edge-style-item {

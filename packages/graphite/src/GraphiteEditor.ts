@@ -3,6 +3,8 @@ import { Edge } from './core/Edge'
 import { Group } from './core/Group'
 import { ImageNode } from './core/ImageNode'
 import { Path } from './core/Path'
+import { CustomNode, type CustomNodeData, type CustomRenderFunction } from './core/CustomNode'
+import { NodeRegistry, type NodeTypeDefinition } from './core/NodeRegistry'
 import { Renderer } from './renderer/Renderer'
 import { SelectionManager } from './interaction/SelectionManager'
 import { DragManager } from './interaction/DragManager'
@@ -82,7 +84,7 @@ export class GraphiteEditor extends EventEmitter {
 
   // 文本编辑状态
   private isEditingText: boolean = false
-  private editingNode: Node | null = null
+  private editingNode: Node | CustomNode | null = null
   private textInput: HTMLTextAreaElement | null = null
 
   // 保存绑定后的函数引用，用于注销事件
@@ -572,49 +574,161 @@ export class GraphiteEditor extends EventEmitter {
 
   // 开始文本编辑
   private startTextEditing(node: Node): void {
+    // 检查是否是自定义节点
+    if (node instanceof CustomNode) {
+      const registry = NodeRegistry.getInstance()
+      const nodeType = registry.get(node.nodeType)
+
+      // 检查是否可编辑
+      if (!nodeType || !nodeType.editable || !nodeType.editable.enabled) {
+        return
+      }
+
+      const field = nodeType.editable.field
+      const currentValue = node.data[field] || ''
+      const multiline = nodeType.editable.multiline || false
+      const editCfg = nodeType.editable
+
+      this.isEditingText = true
+      this.editingNode = node
+
+      const camera = this.renderer.getCamera()
+      const rect = this.canvas.getBoundingClientRect()
+      const zoom = camera.zoom
+
+      const nodeBounds = node.getBounds()
+      const screenTopLeft = camera.worldToScreen({ x: nodeBounds.x, y: nodeBounds.y })
+
+      const offsetX = (editCfg.offsetX ?? 0) * zoom
+      const offsetY = (editCfg.offsetY ?? 0) * zoom
+      const inputWidth = (editCfg.width ?? node.width - (editCfg.offsetX ?? 0) - 10) * zoom
+      const inputHeight = multiline ? 80 * zoom : (editCfg.height ?? 16) * zoom
+      const fontSize = (editCfg.fontSize ?? 13) * zoom
+      const fontWeight = editCfg.fontWeight ?? 'normal'
+      const textAlign = editCfg.textAlign ?? 'left'
+
+      const textarea = document.createElement('textarea')
+      textarea.value = String(currentValue)
+      // 透明样式：只显示光标，文字由 canvas 实时渲染
+      textarea.style.cssText = `
+        position: fixed;
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 0;
+        margin: 0;
+        font-size: ${fontSize}px;
+        font-weight: ${fontWeight};
+        font-family: sans-serif;
+        color: transparent;
+        caret-color: #333;
+        resize: none;
+        z-index: 1000;
+        overflow: hidden;
+        line-height: 1;
+        box-sizing: border-box;
+        white-space: pre;
+        text-align: ${textAlign};
+      `
+
+      textarea.style.width = `${inputWidth}px`
+      textarea.style.height = `${inputHeight}px`
+      textarea.style.left = `${rect.left + screenTopLeft.x + offsetX}px`
+      textarea.style.top = `${rect.top + screenTopLeft.y + offsetY}px`
+
+      document.body.appendChild(textarea)
+      this.textInput = textarea
+
+      textarea.focus()
+      textarea.select()
+
+      // 实时更新：每次输入都触发 canvas 重绘
+      textarea.addEventListener('input', () => {
+        if (this.textInput && this.editingNode instanceof CustomNode) {
+          this.editingNode.data[field] = this.textInput.value
+          // Proxy 会自动触发 markDirty
+        }
+      })
+
+      const finishEditing = () => {
+        if (this.textInput && this.editingNode instanceof CustomNode) {
+          this.editingNode.data[field] = this.textInput.value
+        }
+        this.endTextEditing()
+      }
+
+      textarea.addEventListener('blur', finishEditing)
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !multiline) {
+          e.preventDefault()
+          finishEditing()
+        }
+        if (e.key === 'Enter' && e.ctrlKey && multiline) {
+          e.preventDefault()
+          finishEditing()
+        }
+        if (e.key === 'Escape') {
+          this.endTextEditing()
+        }
+      })
+
+      return
+    }
+
+    // 普通节点的编辑逻辑
     this.isEditingText = true
     this.editingNode = node
 
-    // 创建 textarea
-    const textarea = document.createElement('textarea')
-    textarea.value = node.content
-    textarea.style.cssText = `
-      position: absolute;
-      background: white;
-      border: 2px solid #4A90E2;
-      border-radius: 4px;
-      padding: 4px;
-      font-size: ${node.style.fontSize}px;
-      font-family: sans-serif;
-      color: ${node.style.fontColor};
-      resize: none;
-      outline: none;
-      z-index: 1000;
-      overflow: hidden;
-    `
-
-    // 计算 textarea 位置（屏幕坐标）
     const camera = this.renderer.getCamera()
+    const zoom = camera.zoom
     const center = node.getCenter()
     const screenPos = camera.worldToScreen(center)
     const rect = this.canvas.getBoundingClientRect()
 
-    // 设置 textarea 尺寸和位置
-    const width = node.width
-    const height = node.height
-    textarea.style.width = `${width}px`
-    textarea.style.height = `${height}px`
-    textarea.style.left = `${rect.left + screenPos.x - width / 2}px`
-    textarea.style.top = `${rect.top + screenPos.y - height / 2}px`
+    const nodeWidth = node.width * zoom
+    const nodeHeight = node.height * zoom
+
+    const textarea = document.createElement('textarea')
+    textarea.value = node.content
+    // 透明样式：只显示光标，文字由 canvas 实时渲染
+    textarea.style.cssText = `
+      position: fixed;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 0;
+      margin: 0;
+      font-size: ${node.style.fontSize * zoom}px;
+      font-family: sans-serif;
+      color: transparent;
+      caret-color: ${node.style.fontColor};
+      resize: none;
+      z-index: 1000;
+      overflow: hidden;
+      text-align: center;
+      line-height: ${nodeHeight}px;
+      box-sizing: border-box;
+    `
+
+    textarea.style.width = `${nodeWidth}px`
+    textarea.style.height = `${nodeHeight}px`
+    textarea.style.left = `${rect.left + screenPos.x - nodeWidth / 2}px`
+    textarea.style.top = `${rect.top + screenPos.y - nodeHeight / 2}px`
 
     document.body.appendChild(textarea)
     this.textInput = textarea
 
-    // 聚焦并选中所有文本
     textarea.focus()
     textarea.select()
 
-    // 监听事件
+    // 实时更新
+    textarea.addEventListener('input', () => {
+      if (this.textInput && this.editingNode) {
+        this.editingNode.setContent(this.textInput.value)
+        this.renderer.markDirty()
+      }
+    })
+
     const finishEditing = () => {
       if (this.textInput && this.editingNode) {
         this.editingNode.setContent(this.textInput.value)
@@ -1206,6 +1320,63 @@ export class GraphiteEditor extends EventEmitter {
     this.commandManager.execute(command)
     this.renderer.markDirty()
     return node
+  }
+
+  // 创建自定义节点
+  createCustomNode(data: CustomNodeData): CustomNode {
+    const registry = NodeRegistry.getInstance()
+    const nodeType = registry.get(data.nodeType || 'custom')
+
+    // 如果有注册的节点类型，使用其默认值
+    if (nodeType) {
+      const customNode = new CustomNode({
+        ...data,
+        width: data.width || nodeType.defaultSize?.width || 120,
+        height: data.height || nodeType.defaultSize?.height || 80,
+        data: { ...nodeType.defaultData, ...data.data }
+      }, nodeType.render)
+
+      // 监听数据变化，触发重绘
+      customNode.onDataChange(() => {
+        this.renderer.markDirty()
+      })
+
+      const command = new CreateNodeCommand(customNode, this.nodes)
+      this.commandManager.execute(command)
+      this.renderer.markDirty()
+      return customNode
+    }
+
+    // 否则创建普通自定义节点
+    const customNode = new CustomNode(data)
+    customNode.onDataChange(() => {
+      this.renderer.markDirty()
+    })
+
+    const command = new CreateNodeCommand(customNode, this.nodes)
+    this.commandManager.execute(command)
+    this.renderer.markDirty()
+    return customNode
+  }
+
+  // 注册自定义节点类型
+  registerNodeType(definition: NodeTypeDefinition): void {
+    const registry = NodeRegistry.getInstance()
+    registry.register(definition)
+  }
+
+  // 获取所有注册的节点类型
+  getRegisteredNodeTypes(): NodeTypeDefinition[] {
+    const registry = NodeRegistry.getInstance()
+    return registry.getAll()
+  }
+
+  // 更新自定义节点数据
+  updateCustomNodeData(nodeId: string, data: Record<string, any>): void {
+    const node = this.nodes.find(n => n.id === nodeId)
+    if (node && node instanceof CustomNode) {
+      node.updateData(data)
+    }
   }
 
   // 创建图片节点
