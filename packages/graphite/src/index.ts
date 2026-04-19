@@ -39,6 +39,7 @@ export type {
   EdgeData,
   EdgeStyle,
   PortData,
+  PortDefinition,
   IGraphicObject,
   ICommand,
   LayoutOptions,

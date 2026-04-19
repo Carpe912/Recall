@@ -23,7 +23,7 @@ import {
 import { EventEmitter } from './utils/EventEmitter'
 import { LayoutEngine } from './utils/LayoutEngine'
 import { ThemeManager, type Theme } from './utils/ThemeManager'
-import type { NodeData, EdgeData, Point, NodeStyle, EdgeStyle } from './types'
+import type { NodeData, EdgeData, Point, NodeStyle, EdgeStyle, PortDefinition } from './types'
 import type { LayoutOptions } from './utils/LayoutEngine'
 
 export class GraphiteEditor extends EventEmitter {
@@ -59,7 +59,7 @@ export class GraphiteEditor extends EventEmitter {
   // 连线创建状态
   private isCreatingEdge: boolean = false
   private edgeStartNode: Node | null = null
-  private edgeStartPort: 'top' | 'right' | 'bottom' | 'left' | null = null
+  private edgeStartPort: string | null = null
   private edgePreviewEnd: Point | null = null
   private edgeTargetNode: Node | null = null // 连线目标节点（用于高亮）
 
@@ -1629,6 +1629,24 @@ export class GraphiteEditor extends EventEmitter {
     nodeIds.forEach(id => this.updateNodeStyle(id, style))
   }
 
+  // 设置节点的连接点配置
+  setNodePorts(nodeId: string, ports: PortDefinition[]): void {
+    const node = this.nodes.find(n => n.id === nodeId)
+    if (node) {
+      node.setPorts(ports)
+      this.renderer.markDirty()
+    }
+  }
+
+  // 重置节点连接点为默认 4 端口布局
+  resetNodePorts(nodeId: string): void {
+    const node = this.nodes.find(n => n.id === nodeId)
+    if (node) {
+      node.resetPorts()
+      this.renderer.markDirty()
+    }
+  }
+
   // 更新边样式
   updateEdgeStyle(edgeId: string, style: Partial<EdgeStyle>): void {
     const edge = this.edges.find(e => e.id === edgeId)
@@ -1994,6 +2012,7 @@ export class GraphiteEditor extends EventEmitter {
           content: node.content,
           shape: node.shape,
           style: { ...node.style },
+          ports: node.ports.map(p => ({ ...p })),
         }
         // CustomNode: save nodeType + reactive data
         if (node instanceof CustomNode) {
@@ -2058,6 +2077,7 @@ export class GraphiteEditor extends EventEmitter {
             content: nodeData.content,
             shape: nodeData.shape,
             style: nodeData.style,
+            ports: nodeData.ports,
           })
         }
         // Restore the original id (createNode generates a new one)

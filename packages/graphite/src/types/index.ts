@@ -20,6 +20,19 @@ export interface Transform {
   rotation: number
 }
 
+export interface PortDefinition {
+  /** Unique identifier within the node */
+  id: string
+  /** Normalized X offset from node center: -0.5 = left edge, 0.5 = right edge */
+  dx: number
+  /** Normalized Y offset from node center: -0.5 = top edge, 0.5 = bottom edge */
+  dy: number
+  /** Connection type: 'input' | 'output' | 'both' */
+  type?: 'input' | 'output' | 'both'
+  /** Optional display label */
+  label?: string
+}
+
 export interface NodeData {
   id?: string
   x: number
@@ -29,6 +42,7 @@ export interface NodeData {
   content: string
   shape?: 'rectangle' | 'circle' | 'diamond' | 'triangle'
   style?: NodeStyle
+  ports?: PortDefinition[]
 }
 
 export interface NodeStyle {

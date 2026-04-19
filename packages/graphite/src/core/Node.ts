@@ -1,6 +1,13 @@
 import { GraphicObject } from './GraphicObject'
-import type { NodeData, NodeStyle, Rect, Point } from '../types'
-import { pointInRect } from '../utils/geometry'
+import type { NodeData, NodeStyle, PortDefinition, Rect, Point } from '../types'
+
+/** Default 4-port layout (top / right / bottom / left) */
+const DEFAULT_PORTS: PortDefinition[] = [
+  { id: 'top',    dx: 0,    dy: -0.5, type: 'both' },
+  { id: 'right',  dx: 0.5,  dy: 0,    type: 'both' },
+  { id: 'bottom', dx: 0,    dy: 0.5,  type: 'both' },
+  { id: 'left',   dx: -0.5, dy: 0,    type: 'both' },
+]
 
 export class Node extends GraphicObject {
   width: number
@@ -8,6 +15,8 @@ export class Node extends GraphicObject {
   content: string
   shape: 'rectangle' | 'circle' | 'diamond' | 'triangle'
   style: Required<NodeStyle>
+  /** Configurable port list — defaults to 4 standard ports */
+  ports: PortDefinition[]
 
   constructor(data: NodeData) {
     super('node', data.id)
@@ -17,6 +26,7 @@ export class Node extends GraphicObject {
     this.shape = data.shape || 'rectangle'
     this.transform.x = data.x
     this.transform.y = data.y
+    this.ports = data.ports ? data.ports.map(p => ({ ...p })) : DEFAULT_PORTS.map(p => ({ ...p }))
 
     // 默认样式
     this.style = {
@@ -150,17 +160,12 @@ export class Node extends GraphicObject {
   // 绘制连接点
   private drawPorts(ctx: CanvasRenderingContext2D): void {
     const portRadius = 6
-    const ports = [
-      { x: 0, y: -this.height / 2 },           // top
-      { x: this.width / 2, y: 0 },             // right
-      { x: 0, y: this.height / 2 },            // bottom
-      { x: -this.width / 2, y: 0 },            // left
-    ]
-
-    ports.forEach(port => {
+    this.ports.forEach(port => {
+      const px = port.dx * this.width
+      const py = port.dy * this.height
       ctx.beginPath()
-      ctx.arc(port.x, port.y, portRadius, 0, Math.PI * 2)
-      ctx.fillStyle = '#4A90E2'
+      ctx.arc(px, py, portRadius, 0, Math.PI * 2)
+      ctx.fillStyle = port.type === 'input' ? '#52C41A' : port.type === 'output' ? '#FF7A45' : '#4A90E2'
       ctx.fill()
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 2
@@ -320,6 +325,7 @@ export class Node extends GraphicObject {
       content: this.content,
       shape: this.shape,
       style: { ...this.style },
+      ports: this.ports.map(p => ({ ...p })),
     })
   }
 
@@ -331,69 +337,71 @@ export class Node extends GraphicObject {
     }
   }
 
-  // 获取连接点位置
-  getPortPosition(position: 'top' | 'right' | 'bottom' | 'left'): Point {
+  // 获取连接点位置（世界坐标）
+  getPortPosition(positionOrId: 'top' | 'right' | 'bottom' | 'left' | string): Point {
     const center = this.getCenter()
+    // Try to find by ID first
+    const port = this.ports.find(p => p.id === positionOrId)
+    if (port) {
+      return { x: center.x + port.dx * this.width, y: center.y + port.dy * this.height }
+    }
+    // Legacy fallback for the 4 named positions
     const halfWidth = this.width / 2
     const halfHeight = this.height / 2
-
-    switch (position) {
-      case 'top':
-        return { x: center.x, y: center.y - halfHeight }
-      case 'right':
-        return { x: center.x + halfWidth, y: center.y }
-      case 'bottom':
-        return { x: center.x, y: center.y + halfHeight }
-      case 'left':
-        return { x: center.x - halfWidth, y: center.y }
+    switch (positionOrId) {
+      case 'top':    return { x: center.x,             y: center.y - halfHeight }
+      case 'right':  return { x: center.x + halfWidth, y: center.y              }
+      case 'bottom': return { x: center.x,             y: center.y + halfHeight }
+      case 'left':   return { x: center.x - halfWidth, y: center.y              }
+      default:       return center
     }
   }
 
   // 获取最近的连接点
-  getClosestPort(point: Point): { position: 'top' | 'right' | 'bottom' | 'left', point: Point } {
-    const ports: Array<{ position: 'top' | 'right' | 'bottom' | 'left', point: Point }> = [
-      { position: 'top', point: this.getPortPosition('top') },
-      { position: 'right', point: this.getPortPosition('right') },
-      { position: 'bottom', point: this.getPortPosition('bottom') },
-      { position: 'left', point: this.getPortPosition('left') },
-    ]
-
-    let closest = ports[0]
+  getClosestPort(point: Point): { position: string; point: Point } {
+    let closest: { position: string; point: Point } = { position: this.ports[0]?.id ?? 'top', point: this.getCenter() }
     let minDistance = Infinity
 
-    ports.forEach(port => {
-      const dx = point.x - port.point.x
-      const dy = point.y - port.point.y
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      if (distance < minDistance) {
-        minDistance = distance
-        closest = port
+    this.ports.forEach(port => {
+      const center = this.getCenter()
+      const px = center.x + port.dx * this.width
+      const py = center.y + port.dy * this.height
+      const dx = point.x - px
+      const dy = point.y - py
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < minDistance) {
+        minDistance = dist
+        closest = { position: port.id, point: { x: px, y: py } }
       }
     })
 
     return closest
   }
 
-  // 检测点击的是哪个连接点
-  hitTestPort(x: number, y: number): 'top' | 'right' | 'bottom' | 'left' | null {
-    const portRadius = 8 // 稍微大一点，方便点击
-    const ports: Array<{ position: 'top' | 'right' | 'bottom' | 'left', point: Point }> = [
-      { position: 'top', point: this.getPortPosition('top') },
-      { position: 'right', point: this.getPortPosition('right') },
-      { position: 'bottom', point: this.getPortPosition('bottom') },
-      { position: 'left', point: this.getPortPosition('left') },
-    ]
-
-    for (const port of ports) {
-      const dx = x - port.point.x
-      const dy = y - port.point.y
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      if (distance <= portRadius) {
-        return port.position
+  // 检测点击的是哪个连接点（返回 port id）
+  hitTestPort(x: number, y: number): string | null {
+    const portRadius = 8
+    const center = this.getCenter()
+    for (const port of this.ports) {
+      const px = center.x + port.dx * this.width
+      const py = center.y + port.dy * this.height
+      const dx = x - px
+      const dy = y - py
+      if (dx * dx + dy * dy <= portRadius * portRadius) {
+        return port.id
       }
     }
-
     return null
+  }
+
+  /** Replace this node's port configuration */
+  setPorts(ports: PortDefinition[]): void {
+    this.ports = ports.map(p => ({ ...p }))
+  }
+
+  /** Reset to the default 4-port layout */
+  resetPorts(): void {
+    this.ports = DEFAULT_PORTS.map(p => ({ ...p }))
   }
 
   // 检测调整大小的控制点
