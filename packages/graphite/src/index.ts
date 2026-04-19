@@ -23,6 +23,8 @@ export { CommandManager, CompoundCommand } from './interaction/CommandManager'
 export { EventEmitter } from './utils/EventEmitter'
 export { Animator } from './utils/Animator'
 export { LayoutEngine } from './utils/LayoutEngine'
+export { ConnectionValidator, createDefaultValidator } from './utils/ConnectionValidator'
+export type { ConnectionRule, ValidationResult } from './utils/ConnectionValidator'
 export * from './utils/geometry'
 
 // 协作

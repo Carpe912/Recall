@@ -67,6 +67,10 @@ export interface EdgeData {
   id?: string
   from: string
   to: string
+  /** Source port id (defaults to first port on the node) */
+  fromPort?: string
+  /** Target port id (defaults to first port on the node) */
+  toPort?: string
   label?: string
   waypoints?: Point[]
   style?: EdgeStyle

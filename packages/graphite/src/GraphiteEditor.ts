@@ -23,6 +23,7 @@ import {
 import { EventEmitter } from './utils/EventEmitter'
 import { LayoutEngine } from './utils/LayoutEngine'
 import { ThemeManager, type Theme } from './utils/ThemeManager'
+import { ConnectionValidator, type ConnectionRule } from './utils/ConnectionValidator'
 import type { NodeData, EdgeData, Point, NodeStyle, EdgeStyle, PortDefinition } from './types'
 import type { LayoutOptions } from './utils/LayoutEngine'
 
@@ -82,6 +83,9 @@ export class GraphiteEditor extends EventEmitter {
 
   // 吸附辅助线
   private snapGuides: { x: number[]; y: number[] } = { x: [], y: [] }
+
+  // 连接规则校验器（可选）
+  private connectionValidator: ConnectionValidator | null = null
 
   // 剪贴板
   private clipboard: {
@@ -540,15 +544,34 @@ export class GraphiteEditor extends EventEmitter {
       const targetNode = this.findNodeAt(worldPoint)
 
       if (targetNode && targetNode !== this.edgeStartNode) {
-        // 创建连线，应用默认样式
-        try {
-          this.createEdge({
-            from: this.edgeStartNode.id,
-            to: targetNode.id,
-            style: this.defaultEdgeStyle,
-          })
-        } catch (error) {
-          console.error('Failed to create edge:', error)
+        const fromPortId = this.edgeStartPort ?? this.edgeStartNode.ports[0]?.id ?? 'top'
+        const closestPort = targetNode.getClosestPort(worldPoint)
+        const toPortId = closestPort.position
+
+        // 连接规则校验
+        let allowed = true
+        if (this.connectionValidator) {
+          const result = this.connectionValidator.validate(
+            this.edgeStartNode, targetNode, fromPortId, toPortId, this.edges
+          )
+          if (!result.valid) {
+            allowed = false
+            this.emit('connectionRejected', { reason: result.reason, fromNode: this.edgeStartNode, toNode: targetNode })
+          }
+        }
+
+        if (allowed) {
+          try {
+            this.createEdge({
+              from: this.edgeStartNode.id,
+              to: targetNode.id,
+              fromPort: fromPortId,
+              toPort: toPortId,
+              style: this.defaultEdgeStyle,
+            })
+          } catch (error) {
+            console.error('Failed to create edge:', error)
+          }
         }
       }
 
@@ -1501,6 +1524,16 @@ export class GraphiteEditor extends EventEmitter {
       throw new Error('Cannot create edge: nodes not found')
     }
 
+    // 连接规则校验
+    if (this.connectionValidator) {
+      const fromPortId = data.fromPort ?? fromNode.ports[0]?.id ?? 'top'
+      const toPortId = data.toPort ?? toNode.ports[0]?.id ?? 'top'
+      const result = this.connectionValidator.validate(fromNode, toNode, fromPortId, toPortId, this.edges)
+      if (!result.valid) {
+        throw new Error(result.reason ?? 'Connection rejected by validator')
+      }
+    }
+
     edge.fromNode = fromNode
     edge.toNode = toNode
 
@@ -1957,6 +1990,27 @@ export class GraphiteEditor extends EventEmitter {
 
   getDefaultEdgeStyle(): Partial<EdgeStyle> {
     return this.defaultEdgeStyle
+  }
+
+  // 连接规则校验 API
+  setConnectionValidator(validator: ConnectionValidator | null): void {
+    this.connectionValidator = validator
+  }
+
+  getConnectionValidator(): ConnectionValidator | null {
+    return this.connectionValidator
+  }
+
+  /** Add a single rule to the current validator (creates one if not set). */
+  addConnectionRule(name: string, rule: ConnectionRule): void {
+    if (!this.connectionValidator) {
+      this.connectionValidator = new ConnectionValidator()
+    }
+    this.connectionValidator.addRule(name, rule)
+  }
+
+  removeConnectionRule(name: string): void {
+    this.connectionValidator?.removeRule(name)
   }
 
   // ---- 事务 API ----
