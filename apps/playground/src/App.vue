@@ -324,6 +324,35 @@
 
         <div class="toolbar-sep"></div>
 
+        <!-- 缩放控制 -->
+        <button class="icon-btn" @click="zoomOut">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+          <div class="btn-tip">缩小</div>
+        </button>
+        <div class="zoom-display">{{ zoomPercent }}%</div>
+        <button class="icon-btn" @click="zoomIn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="11" y1="8" x2="11" y2="14"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+          <div class="btn-tip">放大</div>
+        </button>
+        <button class="icon-btn" @click="resetZoom">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 4v6h6"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+          <div class="btn-tip">重置缩放 (100%)</div>
+        </button>
+
+        <div class="toolbar-sep"></div>
+
         <!-- 小地图 -->
         <button class="icon-btn" @click="toggleMinimap" :class="{ active: minimapVisible }">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -377,6 +406,7 @@ import { GraphiteEditor } from '@recall/graphite'
 
 const showExportMenu = ref(false)
 const minimapVisible = ref(false)
+const zoomPercent = ref(100)
 
 const canvasRef = ref<HTMLCanvasElement>()
 let editor: GraphiteEditor | null = null
@@ -454,6 +484,11 @@ onMounted(() => {
         useSmartRouting: firstEdge.style.useSmartRouting || false,
       }
     }
+  })
+
+  // 监听缩放变化
+  editor.on('zoomChanged', (zoom: number) => {
+    zoomPercent.value = Math.round(zoom * 100)
   })
 
   const node1 = editor.createNode({ x: 200, y: 150, width: 120, height: 80, content: 'Node 1' })
@@ -681,6 +716,21 @@ function exportSVG() {
 
 function groupSelected() { editor?.groupSelected('Group') }
 function ungroupSelected() { editor?.ungroupSelected() }
+
+function zoomIn() {
+  if (!editor) return
+  editor.zoomIn()
+}
+
+function zoomOut() {
+  if (!editor) return
+  editor.zoomOut()
+}
+
+function resetZoom() {
+  if (!editor) return
+  editor.resetZoom()
+}
 </script>
 
 <style scoped>
@@ -1025,6 +1075,22 @@ function ungroupSelected() { editor?.ungroupSelected() }
   height: 20px;
   background: #e5e5e5;
   margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.zoom-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  background: #f8f8f8;
+  border-radius: 6px;
+  user-select: none;
   flex-shrink: 0;
 }
 

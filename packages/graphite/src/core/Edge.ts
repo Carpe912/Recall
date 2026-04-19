@@ -140,6 +140,49 @@ export class Edge extends GraphicObject {
     // 检查点是否在路径附近
     const threshold = this.style.strokeWidth + 5
 
+    // 对于曲线，需要采样更多点来检测
+    if (this.style.lineStyle === 'curved' && this.points.length === 2) {
+      const start = this.points[0]
+      const end = this.points[1]
+      const dx = end.x - start.x
+      const dy = end.y - start.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+
+      // 计算控制点（与绘制时相同）
+      const offset = distance * 0.2
+      const midX = (start.x + end.x) / 2
+      const midY = (start.y + end.y) / 2
+      const perpX = -dy / distance
+      const perpY = dx / distance
+      const cp1X = midX + perpX * offset
+      const cp1Y = midY + perpY * offset
+
+      // 采样曲线上的点进行检测
+      const samples = 20
+      for (let i = 0; i < samples; i++) {
+        const t1 = i / samples
+        const t2 = (i + 1) / samples
+
+        // 二次贝塞尔曲线公式
+        const p1x = (1 - t1) * (1 - t1) * start.x + 2 * (1 - t1) * t1 * cp1X + t1 * t1 * end.x
+        const p1y = (1 - t1) * (1 - t1) * start.y + 2 * (1 - t1) * t1 * cp1Y + t1 * t1 * end.y
+        const p2x = (1 - t2) * (1 - t2) * start.x + 2 * (1 - t2) * t2 * cp1X + t2 * t2 * end.x
+        const p2y = (1 - t2) * (1 - t2) * start.y + 2 * (1 - t2) * t2 * cp1Y + t2 * t2 * end.y
+
+        const dist = pointToLineDistance(
+          { x, y },
+          { x: p1x, y: p1y },
+          { x: p2x, y: p2y }
+        )
+
+        if (dist <= threshold) {
+          return true
+        }
+      }
+      return false
+    }
+
+    // 对于直线和折线，检查所有线段
     for (let i = 0; i < this.points.length - 1; i++) {
       const distance = pointToLineDistance(
         { x, y },

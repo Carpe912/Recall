@@ -246,14 +246,37 @@ export class GraphiteEditor extends EventEmitter {
         const selectedNodes = this.selectionManager.getSelectedNodes()
         this.dragManager.startDrag(selectedNodes, worldPoint)
       } else {
-        // 点击空白处，开始框选
-        if (!e.ctrlKey && !e.metaKey) {
-          this.selectionManager.clear()
+        // 检查是否点击了连线
+        const clickedEdge = this.findEdgeAt(worldPoint)
+
+        if (clickedEdge) {
+          // 点击了连线
+          const isMultiSelect = e.ctrlKey || e.metaKey
+
+          if (!this.selectionManager.isEdgeSelected(clickedEdge)) {
+            this.selectionManager.selectEdge(clickedEdge, isMultiSelect)
+          }
+        } else {
+          // 点击空白处，开始框选
+          if (!e.ctrlKey && !e.metaKey) {
+            this.selectionManager.clear()
+          }
+          this.selectionBoxStart = worldPoint
+          this.selectionBoxEnd = worldPoint
         }
-        this.selectionBoxStart = worldPoint
-        this.selectionBoxEnd = worldPoint
       }
     }
+  }
+
+  // 查找指定位置的连线
+  private findEdgeAt(point: Point): Edge | null {
+    // 从后往前查找（后面的连线在上层）
+    for (let i = this.edges.length - 1; i >= 0; i--) {
+      if (this.edges[i].hitTest(point.x, point.y)) {
+        return this.edges[i]
+      }
+    }
+    return null
   }
 
   // 鼠标移动
@@ -487,15 +510,51 @@ export class GraphiteEditor extends EventEmitter {
     }
   }
 
-  // 鼠标滚轮（缩放）
+  // 鼠标滚轮（平移画布）
   private onWheel(e: WheelEvent): void {
     e.preventDefault()
 
-    const point = this.getMousePosition(e)
-    const delta = -e.deltaY * 0.001
+    const camera = this.renderer.getCamera()
 
-    this.renderer.getCamera().scale(delta, point.x, point.y)
+    // 滚轮平移画布（反向）
+    camera.x -= e.deltaX
+    camera.y -= e.deltaY
+
     this.renderer.markDirty()
+  }
+
+  // 缩放画布
+  zoomIn(): void {
+    const camera = this.renderer.getCamera()
+    const canvas = this.canvas
+    const centerX = canvas.width / 2
+    const centerY = canvas.height / 2
+    camera.scale(0.1, centerX, centerY)
+    this.renderer.markDirty()
+    this.emit('zoomChanged', camera.zoom)
+  }
+
+  zoomOut(): void {
+    const camera = this.renderer.getCamera()
+    const canvas = this.canvas
+    const centerX = canvas.width / 2
+    const centerY = canvas.height / 2
+    camera.scale(-0.1, centerX, centerY)
+    this.renderer.markDirty()
+    this.emit('zoomChanged', camera.zoom)
+  }
+
+  resetZoom(): void {
+    const camera = this.renderer.getCamera()
+    camera.zoom = 1
+    camera.x = 0
+    camera.y = 0
+    this.renderer.markDirty()
+    this.emit('zoomChanged', camera.zoom)
+  }
+
+  getZoom(): number {
+    return this.renderer.getCamera().zoom
   }
 
   // 双击事件（编辑文本）
@@ -1061,6 +1120,55 @@ export class GraphiteEditor extends EventEmitter {
 
       // 绘制调整大小的控制点
       node.drawResizeHandles(ctx)
+    })
+
+    // 绘制选中的连线
+    this.selectionManager.getSelectedEdges().forEach(edge => {
+      if (edge.points.length < 2) return
+
+      ctx.strokeStyle = '#4A90E2'
+      ctx.lineWidth = edge.style.strokeWidth / camera.zoom
+      ctx.setLineDash([8 / camera.zoom, 4 / camera.zoom])
+      ctx.globalAlpha = 1
+
+      // 绘制虚线高亮
+      ctx.beginPath()
+
+      const lineStyle = edge.style.lineStyle || 'straight'
+
+      if (lineStyle === 'curved' && edge.points.length === 2) {
+        // 曲线：使用贝塞尔曲线（与 Edge.draw 相同的逻辑）
+        const start = edge.points[0]
+        const end = edge.points[1]
+        const dx = end.x - start.x
+        const dy = end.y - start.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        // 控制点偏移量（垂直于连线方向）
+        const offset = distance * 0.2
+        const midX = (start.x + end.x) / 2
+        const midY = (start.y + end.y) / 2
+
+        // 垂直方向
+        const perpX = -dy / distance
+        const perpY = dx / distance
+
+        const cp1X = midX + perpX * offset
+        const cp1Y = midY + perpY * offset
+
+        ctx.moveTo(start.x, start.y)
+        ctx.quadraticCurveTo(cp1X, cp1Y, end.x, end.y)
+      } else {
+        // 直线或正交线：直接连接点
+        ctx.moveTo(edge.points[0].x, edge.points[0].y)
+        for (let i = 1; i < edge.points.length; i++) {
+          ctx.lineTo(edge.points[i].x, edge.points[i].y)
+        }
+      }
+
+      ctx.stroke()
+
+      ctx.setLineDash([])
     })
 
     ctx.restore()
