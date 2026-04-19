@@ -23,10 +23,11 @@
 15. [节点分组](#15-节点分组)
 16. [小地图（Minimap）](#16-小地图minimap)
 17. [主题系统](#17-主题系统)
-18. [导入导出](#18-导入导出)
-19. [事件总线](#19-事件总线)
-20. [UI 层：Playground（Vue 应用）](#20-ui-层playground-vue-应用)
-21. [构建一个图形编辑器的完整路径](#21-构建一个图形编辑器的完整路径)
+18. [自定义节点系统](#18-自定义节点系统)
+19. [导入导出](#19-导入导出)
+20. [事件总线](#20-事件总线)
+21. [UI 层：Playground（Vue 应用）](#21-ui-层playground-vue-应用)
+22. [构建一个图形编辑器的完整路径](#22-构建一个图形编辑器的完整路径)
 
 ---
 
@@ -38,6 +39,8 @@ packages/graphite/src/
 ├── core/                       # 核心数据模型
 │   ├── GraphicObject.ts        # 所有图形对象的抽象基类
 │   ├── Node.ts                 # 普通节点
+│   ├── CustomNode.ts           # 自定义节点（响应式数据）
+│   ├── NodeRegistry.ts         # 节点类型注册表
 │   ├── Edge.ts                 # 连线
 │   ├── Group.ts                # 节点分组
 │   ├── Path.ts                 # 自由绘制路径
@@ -920,7 +923,344 @@ const themes = {
 
 ---
 
-## 18. 导入导出
+## 18. 自定义节点系统
+
+**文件：** [core/CustomNode.ts](packages/graphite/src/core/CustomNode.ts)，[core/NodeRegistry.ts](packages/graphite/src/core/NodeRegistry.ts)
+
+自定义节点系统允许开发者注册带有自定义渲染逻辑和响应式数据的节点类型，无需修改核心代码即可扩展编辑器功能。
+
+### 18.1 CustomNode：响应式数据节点
+
+`CustomNode` 继承自 `Node`，核心特性是**响应式数据**：
+
+```typescript
+class CustomNode extends Node {
+  nodeType: string
+  data: Record<string, any>  // 响应式数据（Proxy 包装）
+  private renderFunction: CustomRenderFunction | null
+  
+  constructor(nodeData: CustomNodeData, renderFn?: CustomRenderFunction) {
+    super(nodeData)
+    this.nodeType = nodeData.nodeType || 'custom'
+    this.data = this.createReactiveData(nodeData.data || {})
+    this.renderFunction = renderFn || null
+  }
+}
+```
+
+**响应式数据实现：**
+
+使用 `Proxy` 拦截数据变化，自动触发重绘：
+
+```typescript
+private createReactiveData(data: Record<string, any>): Record<string, any> {
+  const self = this
+  return new Proxy(data, {
+    set(target, property, value) {
+      const oldValue = target[property as string]
+      if (oldValue !== value) {
+        target[property as string] = value
+        // 触发数据变化回调
+        self.dataChangeCallbacks.forEach(callback => {
+          callback({ property, value, oldValue })
+        })
+        // 触发重绘
+        self.emitNeedsRedraw()
+      }
+      return true
+    }
+  })
+}
+```
+
+这意味着：`node.data.value = 80` 会自动触发 canvas 重绘，无需手动调用 `markDirty()`。
+
+### 18.2 NodeRegistry：节点类型注册表
+
+`NodeRegistry` 是单例模式，管理所有自定义节点类型的定义：
+
+```typescript
+interface NodeTypeDefinition {
+  name: string                      // 节点类型标识符
+  label: string                     // 侧边栏显示名称
+  description?: string              // 可选的 tooltip 描述
+  render: CustomRenderFunction      // 渲染函数
+  preview?: CustomRenderFunction    // 可选的简化预览渲染（用于生成缩略图）
+  defaultData?: Record<string, any> // 默认数据
+  defaultSize?: { width: number; height: number }
+  editable?: EditableConfig         // 文本编辑配置
+}
+
+const registry = NodeRegistry.getInstance()
+registry.register({
+  name: 'progress',
+  label: '进度条',
+  defaultSize: { width: 200, height: 60 },
+  defaultData: { label: '进度', value: 60, max: 100 },
+  render: ({ ctx, bounds, data }) => {
+    // 自定义渲染逻辑
+  }
+})
+```
+
+### 18.3 自定义渲染函数
+
+渲染函数接收一个 `RenderContext` 对象：
+
+```typescript
+interface RenderContext {
+  ctx: CanvasRenderingContext2D
+  bounds: { x: number; y: number; width: number; height: number }
+  data: Record<string, any>
+  isSelected: boolean
+}
+```
+
+**关键点：** `bounds` 是**本地坐标系**，原点在节点左上角（不是中心）。这与 `Node.draw()` 中的中心坐标系不同，是为了让自定义渲染更直观：
+
+```typescript
+render: ({ ctx, bounds, data }) => {
+  const { label, value, max } = data
+  
+  // 背景（从左上角开始）
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height)
+  
+  // 进度条（相对于 bounds 定位）
+  const barY = bounds.y + 15 + 20
+  const barWidth = bounds.width - 30
+  const progress = value / max
+  ctx.fillRect(bounds.x + 15, barY, barWidth * progress, 20)
+}
+```
+
+### 18.4 文本编辑配置
+
+`EditableConfig` 定义哪个数据字段可编辑，以及编辑框的位置和样式：
+
+```typescript
+interface EditableConfig {
+  enabled: boolean
+  field: string           // 要编辑的数据字段名（如 'label'）
+  multiline?: boolean     // 是否支持多行
+  offsetX?: number        // 输入框 x 偏移（像素，相对于节点左上角）
+  offsetY?: number        // 输入框 y 偏移
+  width?: number          // 输入框宽度
+  height?: number         // 输入框高度
+  fontSize?: number       // 字号（必须与 canvas 渲染一致）
+  fontWeight?: string     // 字重（必须与 canvas 渲染一致）
+  textAlign?: string      // 对齐方式（'left' | 'center' | 'right'）
+}
+```
+
+**为什么 `fontSize`、`fontWeight`、`textAlign` 必须与 canvas 一致？**
+
+双击节点时，会创建一个**透明的 textarea 覆盖层**，只显示光标，文字由 canvas 实时渲染。如果 textarea 的字体样式与 canvas 不匹配，光标位置会错位。
+
+**文本编辑实现原理：**
+
+```typescript
+// 创建透明 textarea
+textarea.style.cssText = `
+  position: fixed;
+  background: transparent;
+  border: none;
+  color: transparent;        // 文字透明
+  caret-color: #333;         // 光标可见
+  font-size: ${fontSize}px;
+  font-weight: ${fontWeight};
+  text-align: ${textAlign};
+`
+
+// 实时更新数据（触发 Proxy → 重绘）
+textarea.addEventListener('input', () => {
+  node.data[field] = textarea.value
+})
+```
+
+### 18.5 预览缩略图生成
+
+`NodeRegistry.generatePreview()` 用节点的 `render` 函数渲染一张缩略图，用于侧边栏展示：
+
+```typescript
+static generatePreview(
+  definition: NodeTypeDefinition,
+  size: { width: number; height: number } = { width: 80, height: 60 }
+): string {
+  const canvas = document.createElement('canvas')
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = size.width * dpr
+  canvas.height = size.height * dpr
+  
+  const ctx = canvas.getContext('2d')!
+  ctx.scale(dpr, dpr)
+  
+  // 等比缩放节点到缩略图尺寸
+  const nodeWidth = definition.defaultSize?.width || 120
+  const nodeHeight = definition.defaultSize?.height || 80
+  const scale = Math.min(
+    (size.width - 8) / nodeWidth,
+    (size.height - 8) / nodeHeight
+  )
+  
+  ctx.save()
+  ctx.translate(offsetX, offsetY)
+  ctx.scale(scale, scale)
+  
+  // 使用 preview 或 render 函数绘制
+  const renderFn = definition.preview ?? definition.render
+  renderFn({
+    ctx,
+    bounds: { x: 0, y: 0, width: nodeWidth, height: nodeHeight },
+    data: definition.defaultData ?? {},
+    isSelected: false,
+  })
+  
+  ctx.restore()
+  return canvas.toDataURL()
+}
+```
+
+**为什么需要 `preview` 函数？**
+
+某些节点在小尺寸下细节太密（如仪表盘的刻度线），可以提供一个简化版的 `preview` 函数，只画主要元素。如果不提供，默认使用 `render` 函数。
+
+### 18.6 内置节点类型
+
+Graphite 内置了 8 种富节点类型，展示了自定义节点系统的能力：
+
+| 节点类型 | 用途 | 可编辑字段 |
+|---------|------|-----------|
+| `table` | 数据表格 | 不可编辑 |
+| `progress` | 进度条 | `label` |
+| `card` | 渐变卡片 | `title` |
+| `gauge` | 仪表盘 | `label` |
+| `user-card` | 用户卡片 | `name` |
+| `image-card` | 图片卡片 | `title` |
+| `timeline` | 时间轴 | `title` |
+| `stat-card` | 统计卡片 | `label` |
+
+**示例：仪表盘节点**
+
+```typescript
+registry.register({
+  name: 'gauge',
+  label: '仪表盘',
+  defaultSize: { width: 180, height: 180 },
+  defaultData: {
+    label: '速度',
+    value: 65,
+    max: 100,
+    unit: 'km/h'
+  },
+  editable: {
+    enabled: true,
+    field: 'label',
+    offsetX: 0,
+    offsetY: 153,
+    width: 180,
+    height: 18,
+    fontSize: 13,
+    fontWeight: 'normal',
+    textAlign: 'center'  // 居中对齐
+  },
+  render: ({ ctx, bounds, data }) => {
+    const { label, value, max, unit } = data
+    const centerX = bounds.x + bounds.width / 2
+    const centerY = bounds.y + bounds.height / 2 + 20
+    const radius = Math.min(bounds.width, bounds.height) / 2 - 30
+    
+    // 绘制刻度背景弧
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle)
+    ctx.strokeStyle = '#f0f0f0'
+    ctx.lineWidth = 20
+    ctx.stroke()
+    
+    // 绘制进度弧（渐变色）
+    const progress = value / max
+    const currentAngle = startAngle + (endAngle - startAngle) * progress
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius, startAngle, currentAngle)
+    const gradient = ctx.createLinearGradient(...)
+    ctx.strokeStyle = gradient
+    ctx.stroke()
+    
+    // 绘制指针、数值、标签...
+  }
+})
+```
+
+### 18.7 动态侧边栏
+
+Playground 的侧边栏不再硬编码节点列表，而是动态从 `NodeRegistry` 读取：
+
+```typescript
+// App.vue
+const customNodeTypes = ref<Array<NodeTypeDefinition & { previewUrl: string }>>([])
+
+function loadCustomNodeTypes() {
+  const types = NodeRegistry.getInstance().getAll()
+  customNodeTypes.value = types.map((def: NodeTypeDefinition) => ({
+    ...def,
+    previewUrl: NodeRegistry.generatePreview(def, { width: 80, height: 60 }),
+  }))
+}
+
+onMounted(() => {
+  editor = new GraphiteEditor(canvasRef.value)
+  loadCustomNodeTypes()  // 加载节点类型和缩略图
+})
+```
+
+模板中使用 `v-for` 渲染：
+
+```vue
+<div v-for="nodeType in customNodeTypes" :key="nodeType.name">
+  <img :src="nodeType.previewUrl" width="40" height="40" />
+  <span>{{ nodeType.label }}</span>
+</div>
+```
+
+这样，注册新节点类型后，侧边栏会自动出现对应的缩略图和名称，无需手动维护 UI。
+
+### 18.8 使用自定义节点
+
+```typescript
+// 创建自定义节点
+const progressNode = editor.createCustomNode({
+  x: 200,
+  y: 200,
+  nodeType: 'progress'  // 不需要传 width/height，使用 defaultSize
+})
+
+// 更新节点数据（自动触发重绘）
+editor.updateCustomNodeData(progressNode.id, { value: 80 })
+
+// 双击节点可编辑 label 字段
+```
+
+### 18.9 设计要点
+
+**为什么用 Proxy 而不是 Vue 的 reactive？**
+
+`CustomNode` 是纯 TypeScript 类，不依赖任何框架。使用原生 `Proxy` 保持库的框架无关性。
+
+**为什么 `bounds` 用本地坐标而不是中心坐标？**
+
+中心坐标（`x: -width/2, y: -height/2`）对数学变换友好，但对 UI 绘制不直观。自定义节点的渲染函数通常由非图形专业的开发者编写，左上角坐标系更符合直觉。
+
+**为什么 `editable.offsetY` 需要手动计算？**
+
+因为 canvas 的 `textBaseline` 有多种模式（`'top'`、`'middle'`、`'alphabetic'`），不同模式下文字的视觉位置不同。`offsetY` 必须精确匹配 canvas 渲染的文字顶部位置，才能让 textarea 光标对齐。
+
+**为什么不直接用 `contenteditable` div？**
+
+`contenteditable` 的样式控制复杂，且在不同浏览器下行为不一致。`textarea` 更可控，配合透明样式 + canvas 实时渲染，体验更好。
+
+---
+
+## 19. 导入导出
 
 **文件：** [GraphiteEditor.ts](packages/graphite/src/GraphiteEditor.ts) 中的 `exportToJSON / importFromJSON / exportToPNG / exportToSVG`
 
@@ -950,7 +1290,7 @@ const themes = {
 
 ---
 
-## 19. 事件总线
+## 20. 事件总线
 
 **文件：** [utils/EventEmitter.ts](packages/graphite/src/utils/EventEmitter.ts)
 
@@ -976,7 +1316,7 @@ editor.on('selectionChanged', (nodeIds: string[]) => {
 
 ---
 
-## 20. UI 层：Playground（Vue 应用）
+## 21. UI 层：Playground（Vue 应用）
 
 **文件：** [apps/playground/src/App.vue](apps/playground/src/App.vue)
 
@@ -998,7 +1338,9 @@ onUnmounted(() => {
 
 UI 功能清单：
 - 添加节点（支持形状选择：矩形/圆形/菱形/三角形）
+- 添加自定义节点（8 种内置富节点类型，动态侧边栏）
 - 添加连线（支持线型：直线/曲线/折线 + 智能路由开关）
+- 双击编辑文本（透明 textarea + canvas 实时渲染）
 - 铅笔自由绘制
 - 撤销/重做
 - 自动布局（5 种算法）
@@ -1010,7 +1352,7 @@ UI 功能清单：
 
 ---
 
-## 21. 构建一个图形编辑器的完整路径
+## 22. 构建一个图形编辑器的完整路径
 
 如果你要从零开始构建一个类似的图形编辑器，建议按以下顺序实现：
 
@@ -1067,6 +1409,17 @@ UI 功能清单：
 34. 图片节点（拖放图片文件）
 35. 节点分组
 
+### 阶段七：自定义节点系统（2-3 天）
+
+36. 实现 `CustomNode` 类（响应式数据 Proxy）
+37. 实现 `NodeRegistry` 单例（注册、查询节点类型）
+38. 自定义渲染函数接口（`RenderContext`）
+39. 文本编辑配置（`EditableConfig`）
+40. 透明 textarea 覆盖层 + 实时 canvas 渲染
+41. 预览缩略图生成（offscreen canvas）
+42. 动态侧边栏（从 registry 读取并渲染）
+43. 内置富节点类型（表格、进度条、仪表盘等）
+
 ### 常见坑和注意事项
 
 - **坐标系**：始终区分屏幕坐标和世界坐标，每次鼠标事件都要先转换
@@ -1076,6 +1429,9 @@ UI 功能清单：
 - **内存泄漏**：销毁时要移除所有事件监听器，特别是加在 `window` 上的
 - **连线更新**：节点移动时要立即重新计算所有相关连线的路径
 - **撤销边界**：拖拽结束才记录移动命令，否则 undo 会双倍还原
+- **文本编辑光标对齐**：textarea 的 `fontSize`、`fontWeight`、`textAlign` 必须与 canvas 渲染完全一致
+- **自定义节点坐标系**：render 函数的 `bounds` 是本地坐标（左上角为原点），不是中心坐标
+- **响应式数据**：使用 Proxy 拦截 `data` 变化，自动触发重绘，避免手动 `markDirty()`
 
 ---
 
