@@ -3,8 +3,10 @@ import type { Rect } from '../types'
 export class DirtyRectManager {
   private dirtyRegions: Rect[] = []
   private isDirty: boolean = false
+  // 是否需要全量重绘（相机移动、主题切换等）
+  private fullRedraw: boolean = false
 
-  // 标记区域为脏
+  // 标记屏幕坐标区域为脏（已经过 camera 转换）
   markDirty(rect: Rect): void {
     this.dirtyRegions.push(rect)
     this.isDirty = true
@@ -13,7 +15,13 @@ export class DirtyRectManager {
   // 标记整个画布为脏
   markAllDirty(width: number, height: number): void {
     this.dirtyRegions = [{ x: 0, y: 0, width, height }]
+    this.fullRedraw = true
     this.isDirty = true
+  }
+
+  // 是否需要全量重绘
+  needsFullRedraw(): boolean {
+    return this.fullRedraw
   }
 
   // 检查是否有脏区域
@@ -21,13 +29,12 @@ export class DirtyRectManager {
     return this.isDirty
   }
 
-  // 获取合并后的脏区域
-  getDirtyRegions(): Rect[] {
+  // 获取合并后的脏区域（屏幕坐标，已加 padding 防止边缘裁切）
+  getDirtyRegions(padding: number = 4): Rect[] {
     if (this.dirtyRegions.length === 0) {
       return []
     }
 
-    // 简单实现：返回包含所有脏区域的最小矩形
     let minX = Infinity
     let minY = Infinity
     let maxX = -Infinity
@@ -41,10 +48,10 @@ export class DirtyRectManager {
     })
 
     return [{
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
+      x: minX - padding,
+      y: minY - padding,
+      width: maxX - minX + padding * 2,
+      height: maxY - minY + padding * 2,
     }]
   }
 
@@ -52,5 +59,6 @@ export class DirtyRectManager {
   clear(): void {
     this.dirtyRegions = []
     this.isDirty = false
+    this.fullRedraw = false
   }
 }

@@ -3,6 +3,7 @@ import type { Edge } from '../core/Edge'
 import { Camera } from './Camera'
 import { DirtyRectManager } from './DirtyRectManager'
 import type { ThemeColors } from '../utils/ThemeManager'
+import type { Rect } from '../types'
 
 export class Renderer {
   private canvas: HTMLCanvasElement
@@ -56,43 +57,73 @@ export class Renderer {
   }
 
   // 标记需要重新渲染
-  markDirty(): void {
+  // rect 为世界坐标包围盒；不传则全量重绘
+  markDirty(worldRect?: Rect): void {
     this.needsRender = true
-    this.dirtyRectManager.markAllDirty(this.canvas.width, this.canvas.height)
+    if (!worldRect) {
+      this.dirtyRectManager.markAllDirty(this.canvas.width, this.canvas.height)
+      return
+    }
+    // 世界坐标 → 屏幕坐标
+    const dpr = window.devicePixelRatio || 1
+    const topLeft = this.camera.worldToScreen({ x: worldRect.x, y: worldRect.y })
+    const bottomRight = this.camera.worldToScreen({
+      x: worldRect.x + worldRect.width,
+      y: worldRect.y + worldRect.height,
+    })
+    this.dirtyRectManager.markDirty({
+      x: topLeft.x * dpr,
+      y: topLeft.y * dpr,
+      width: (bottomRight.x - topLeft.x) * dpr,
+      height: (bottomRight.y - topLeft.y) * dpr,
+    })
   }
 
   // 渲染场景
   render(nodes: Node[], edges: Edge[], selectedNodeIds: string[] = []): void {
     if (!this.needsRender) return
 
-    this.ctx.save()
+    const fullRedraw = this.dirtyRectManager.needsFullRedraw()
+    const dirtyRegions = this.dirtyRectManager.getDirtyRegions()
 
-    // 清除画布并填充背景色
-    this.ctx.fillStyle = this.themeColors.background
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    if (fullRedraw || dirtyRegions.length === 0) {
+      // 全量重绘
+      this.ctx.save()
+      this.ctx.fillStyle = this.themeColors.background
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+      this.drawBackground()
+      this.camera.applyTransform(this.ctx)
+      edges.forEach(edge => { if (edge.visible) edge.draw(this.ctx) })
+      nodes.forEach(node => {
+        if (node.visible) node.draw(this.ctx, selectedNodeIds.includes(node.id))
+      })
+      this.ctx.restore()
+    } else {
+      // 局部重绘：只清除并重绘脏区域
+      const dirty = dirtyRegions[0]
 
-    // 绘制背景
-    this.drawBackground()
+      this.ctx.save()
+      // clip 到脏区域，所有后续绘制都被裁切在此范围内
+      this.ctx.beginPath()
+      this.ctx.rect(dirty.x, dirty.y, dirty.width, dirty.height)
+      this.ctx.clip()
 
-    // 应用相机变换
-    this.camera.applyTransform(this.ctx)
+      // 清除脏区域并填充背景色
+      this.ctx.fillStyle = this.themeColors.background
+      this.ctx.fillRect(dirty.x, dirty.y, dirty.width, dirty.height)
 
-    // 先绘制边
-    edges.forEach(edge => {
-      if (edge.visible) {
-        edge.draw(this.ctx)
-      }
-    })
+      // 重绘背景网格（clip 已限制范围，不会超出）
+      this.drawBackground()
 
-    // 再绘制节点
-    nodes.forEach(node => {
-      if (node.visible) {
-        const showPorts = selectedNodeIds.includes(node.id)
-        node.draw(this.ctx, showPorts)
-      }
-    })
+      // 应用相机变换后重绘所有图形（clip 保证只有脏区域内的像素被写入）
+      this.camera.applyTransform(this.ctx)
+      edges.forEach(edge => { if (edge.visible) edge.draw(this.ctx) })
+      nodes.forEach(node => {
+        if (node.visible) node.draw(this.ctx, selectedNodeIds.includes(node.id))
+      })
 
-    this.ctx.restore()
+      this.ctx.restore()
+    }
 
     this.needsRender = false
     this.dirtyRectManager.clear()

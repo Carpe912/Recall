@@ -324,6 +324,123 @@ for (let x = startX; x <= endX; x += gridSize) {
 ctx.lineWidth = 1 / camera.zoom
 ```
 
+### 4.3 DirtyRectManager（脏区域管理）
+
+**文件：** [renderer/DirtyRectManager.ts](packages/graphite/src/renderer/DirtyRectManager.ts)
+
+脏区域（Dirty Rect）是渲染性能优化的核心技术：只重绘内容发生变化的屏幕区域，跳过未变化的部分。
+
+**问题背景：**
+
+画布如果每帧全部清除并重绘，代价很高。例如 2000×1500 的画布上只移动了一个小节点，实际上只有那个节点占据的区域需要重绘。
+
+**接口设计：**
+
+```typescript
+class DirtyRectManager {
+  markDirty(rect: Rect): void      // 标记屏幕坐标区域为脏（已过 camera 转换）
+  markAllDirty(w, h): void         // 标记整个画布为脏（全量重绘）
+  needsFullRedraw(): boolean       // 是否需要全量重绘
+  getDirtyRegions(padding): Rect[] // 获取合并后的脏区域（含 padding 防边缘裁切）
+  clear(): void                    // 清空，等待下一帧
+}
+```
+
+**Renderer 中的集成：**
+
+`markDirty()` 接受可选的**世界坐标**包围盒：
+- 不传 → `markAllDirty()`，下一帧全量重绘
+- 传入 `worldRect` → 转换为屏幕坐标（含 DPR 缩放），写入 `DirtyRectManager`
+
+```typescript
+markDirty(worldRect?: Rect): void {
+  if (!worldRect) {
+    this.dirtyRectManager.markAllDirty(this.canvas.width, this.canvas.height)
+    return
+  }
+  const dpr = window.devicePixelRatio || 1
+  const topLeft = this.camera.worldToScreen({ x: worldRect.x, y: worldRect.y })
+  const bottomRight = this.camera.worldToScreen({
+    x: worldRect.x + worldRect.width,
+    y: worldRect.y + worldRect.height,
+  })
+  this.dirtyRectManager.markDirty({
+    x: topLeft.x * dpr,
+    y: topLeft.y * dpr,
+    width: (bottomRight.x - topLeft.x) * dpr,
+    height: (bottomRight.y - topLeft.y) * dpr,
+  })
+}
+```
+
+`render()` 根据是否需要全量重绘走��同分支：
+
+```typescript
+render(nodes, edges, selectedNodeIds): void {
+  if (!this.needsRender) return
+
+  if (this.dirtyRectManager.needsFullRedraw()) {
+    // 全量：清除整个画布，重绘所有内容
+    this.ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // ... 绘制所有内容
+  } else {
+    const dirty = this.dirtyRectManager.getDirtyRegions()[0]
+
+    // 局部：clip 到脏区域，只清除并重绘该矩形
+    this.ctx.save()
+    this.ctx.beginPath()
+    this.ctx.rect(dirty.x, dirty.y, dirty.width, dirty.height)
+    this.ctx.clip()  // 后续所有绘制都被限制在 dirty 范围内
+
+    this.ctx.fillStyle = this.themeColors.background
+    this.ctx.fillRect(dirty.x, dirty.y, dirty.width, dirty.height)
+    this.drawBackground()
+    this.camera.applyTransform(this.ctx)
+    // ... 重绘所有图形（clip 保证超出范围的像素不被写入）
+    this.ctx.restore()
+  }
+
+  this.dirtyRectManager.clear()
+}
+```
+
+**GraphiteEditor 中的集成：**
+
+`markDirtyForObjects()` 是私有辅助方法，计算一组节点和边的合并包围盒（世界坐标），再调用 `renderer.markDirty(worldRect)`：
+
+```typescript
+private markDirtyForObjects(nodes: Node[], edges: Edge[] = []): void {
+  // 遍历所有对象，计算 minX/minY/maxX/maxY
+  nodes.forEach(n => expand(n.getBounds()))
+  edges.forEach(e => { if (e.points.length >= 2) expand(e.getBounds()) })
+
+  const pad = 20  // 世界坐标 padding，防止阴影/边框被裁切
+  this.renderer.markDirty({ x: minX - pad, y: minY - pad,
+    width: maxX - minX + pad * 2, height: maxY - minY + pad * 2 })
+}
+```
+
+**哪些操作走局部重绘，哪些走全量：**
+
+| 操作 | 重绘策略 | 原因 |
+|------|----------|------|
+| 创建/更新单个节点或边 | 局部 | 影响范围明确 |
+| 拖拽节点（含关联边） | 局部 | 只有被拖节点区域变化 |
+| 调整节点大小（含关联边） | 局部 | 同上 |
+| 更新节点/边样式 | 局部 | 影响范围明确 |
+| 相机平移/缩放 | 全量 | 整个视口内容都变了 |
+| 框选、hover、撤销/重做 | 全量 | 影响范围不确定 |
+| 主题切换、尺寸调整 | 全量 | 全局样式变化 |
+
+**`ctx.clip()` 的工作原理：**
+
+`clip()` 会把当前路径设为裁切区域，此后所有绘制操作（包括 `fillRect`、`stroke`、`drawImage` 等）只有落在裁切区域内的像素才会被写入 Canvas。配合 `ctx.save()` / `ctx.restore()` 可以在局部重绘后恢复到无裁切状态。
+
+```
+全量重绘：清除整个 2000×1500 = 300万像素
+局部重绘：clip 到 200×100 的脏矩形 = 2万像素（性能提升 15×）
+```
+
 ---
 
 ## 5. 交互系统：事件处理

@@ -169,8 +169,12 @@ export class GraphiteEditor extends EventEmitter {
 
     // 拖拽事件
     this.dragManager.on('drag', () => {
+      const draggedNodes = this.dragManager.getDraggedNodes()
+      const relatedEdges = this.edges.filter(e =>
+        draggedNodes.some(n => n.id === e.fromNodeId || n.id === e.toNodeId)
+      )
       this.updateEdges()
-      this.renderer.markDirty()
+      this.markDirtyForObjects(draggedNodes, relatedEdges)
     })
 
     this.dragManager.on('dragEnd', (nodes: Node[], dx: number, dy: number) => {
@@ -378,8 +382,9 @@ export class GraphiteEditor extends EventEmitter {
       const dy = worldPoint.y - this.resizeStartPoint.y
 
       this.handleResize(this.resizeNode, this.resizeHandle, dx, dy)
+      const relatedEdges = this.edges.filter(e => e.fromNodeId === this.resizeNode!.id || e.toNodeId === this.resizeNode!.id)
       this.updateEdges()
-      this.renderer.markDirty()
+      this.markDirtyForObjects([this.resizeNode], relatedEdges)
       return
     }
 
@@ -1430,12 +1435,33 @@ export class GraphiteEditor extends EventEmitter {
     ctx.restore()
   }
 
+  // 计算节点和边的合并包围盒，触发局部重绘
+  // 比直接 markDirty() 精确：只重绘涉及的对象区域
+  private markDirtyForObjects(nodes: Node[], edges: Edge[] = []): void {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    const expand = (b: { x: number; y: number; width: number; height: number }) => {
+      minX = Math.min(minX, b.x)
+      minY = Math.min(minY, b.y)
+      maxX = Math.max(maxX, b.x + b.width)
+      maxY = Math.max(maxY, b.y + b.height)
+    }
+    nodes.forEach(n => expand(n.getBounds()))
+    edges.forEach(e => { if (e.points.length >= 2) expand(e.getBounds()) })
+    if (minX === Infinity) {
+      this.renderer.markDirty()
+      return
+    }
+    // 加 padding 避免边框/阴影被裁剪（世界坐标）
+    const pad = 20
+    this.renderer.markDirty({ x: minX - pad, y: minY - pad, width: maxX - minX + pad * 2, height: maxY - minY + pad * 2 })
+  }
+
   // 创建节点
   createNode(data: NodeData): Node {
     const node = new Node(data)
     const command = new CreateNodeCommand(node, this.nodes)
     this.commandManager.execute(command)
-    this.renderer.markDirty()
+    this.markDirtyForObjects([node])
     return node
   }
 
@@ -1455,24 +1481,24 @@ export class GraphiteEditor extends EventEmitter {
 
       // 监听数据变化，触发重绘
       customNode.onDataChange(() => {
-        this.renderer.markDirty()
+        this.markDirtyForObjects([customNode])
       })
 
       const command = new CreateNodeCommand(customNode, this.nodes)
       this.commandManager.execute(command)
-      this.renderer.markDirty()
+      this.markDirtyForObjects([customNode])
       return customNode
     }
 
     // 否则创建普通自定义节点
     const customNode = new CustomNode(data)
     customNode.onDataChange(() => {
-      this.renderer.markDirty()
+      this.markDirtyForObjects([customNode])
     })
 
     const command = new CreateNodeCommand(customNode, this.nodes)
     this.commandManager.execute(command)
-    this.renderer.markDirty()
+    this.markDirtyForObjects([customNode])
     return customNode
   }
 
@@ -1508,7 +1534,7 @@ export class GraphiteEditor extends EventEmitter {
     })
     const command = new CreateNodeCommand(imageNode, this.nodes)
     this.commandManager.execute(command)
-    this.renderer.markDirty()
+    this.markDirtyForObjects([imageNode])
     return imageNode
   }
 
@@ -1540,7 +1566,7 @@ export class GraphiteEditor extends EventEmitter {
     const command = new CreateEdgeCommand(edge, this.edges)
     this.commandManager.execute(command)
     this.updateEdges()
-    this.renderer.markDirty()
+    this.markDirtyForObjects([fromNode, toNode], [edge])
     return edge
   }
 
@@ -1654,7 +1680,7 @@ export class GraphiteEditor extends EventEmitter {
     if (!node) return
 
     Object.assign(node.style, style)
-    this.renderer.markDirty()
+    this.markDirtyForObjects([node])
   }
 
   // 批量更新节点样式
@@ -1667,7 +1693,7 @@ export class GraphiteEditor extends EventEmitter {
     const node = this.nodes.find(n => n.id === nodeId)
     if (node) {
       node.setPorts(ports)
-      this.renderer.markDirty()
+      this.markDirtyForObjects([node])
     }
   }
 
@@ -1676,7 +1702,7 @@ export class GraphiteEditor extends EventEmitter {
     const node = this.nodes.find(n => n.id === nodeId)
     if (node) {
       node.resetPorts()
-      this.renderer.markDirty()
+      this.markDirtyForObjects([node])
     }
   }
 
@@ -1686,7 +1712,8 @@ export class GraphiteEditor extends EventEmitter {
     if (!edge) return
 
     Object.assign(edge.style, style)
-    this.renderer.markDirty()
+    const nodes = [edge.fromNode, edge.toNode].filter(Boolean) as Node[]
+    this.markDirtyForObjects(nodes, [edge])
   }
 
   // 批量更新边样式
