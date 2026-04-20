@@ -1841,7 +1841,11 @@ UI 功能清单：
 - **端口归一化坐标**：`dx/dy` 范围 ±0.5，节点缩放后端口自动跟随，无需重新计算像素位置
 - **渐变边框**：Canvas 的 `strokeStyle` 可以接受 `CanvasGradient` 对象，不只是颜色字符串
 - **事务嵌套**：`transactionDepth` 计数器保证只有最外层 commit 才写入历史，内层 commit 只是计数
+- **脏区域 padding**：局部重绘时脏矩形要加 padding（本项目世界坐标 20px），否则阴影、粗边框会被裁切
+- **脏区域坐标系**：`DirtyRectManager` 存储的是**屏幕像素坐标**（已乘 DPR），`markDirty(worldRect)` 负责做世界→屏幕转换，两者不要混淆
+- **`ctx.clip()` 与 `save/restore`**：clip 是累积的，每次局部重绘前必须 `ctx.save()`，完成后 `ctx.restore()`，否则下一帧的全量重绘也会被上一帧的裁切区域限制
+- **全量 vs 局部的选择**：相机移动、主题切换等影响全视口的操作必须走全量重绘；只有影响范围确定的单对象操作才适合局部重绘
 
 ---
 
-> 本文档基于 `packages/graphite` 源码整理，版本日期：2026-04-19。
+> 本文档基于 `packages/graphite` 源码整理，版本日期：2026-04-20。
