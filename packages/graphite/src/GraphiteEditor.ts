@@ -188,7 +188,9 @@ export class GraphiteEditor extends EventEmitter {
 
   // 鼠标按下
   private onMouseDown(e: MouseEvent): void {
+    /** 获取鼠标相对于画布的位置  在canvas上面的从原点开始的坐标 */
     const point = this.getMousePosition(e)
+    /** 世界坐标系，整个画布的绝对坐标系，不管画布如何拖动，缩放，这些值不会变 */
     const worldPoint = this.renderer.getCamera().screenToWorld(point)
 
     // 空格 + 鼠标左键 = 平移画布
