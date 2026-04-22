@@ -2,134 +2,241 @@
   <div class="prose-playground">
     <div class="header">
       <h1>Recall Prose 编辑器</h1>
-      <a href="/" class="back-link">← 返回图形编辑器</a>
+      <div class="header-actions">
+        <div class="view-mode">
+          <select v-model="viewMode" class="view-mode-select" aria-label="视图模式">
+            <option value="wysiwyg">所见即所得</option>
+            <option value="preview">实时预览</option>
+          </select>
+        </div>
+        <a href="/" class="back-link">← 返回图形编辑器</a>
+      </div>
     </div>
 
-    <div class="prose-demo">
-      <h2>Prose 编辑器演示</h2>
-      <p class="description">基于 Tiptap 的功能丰富的散文编辑器，支持分栏和高亮块等自定义功能</p>
-
-      <div class="editor-wrapper">
-        <ProseEditor
-          v-model="content"
-          placeholder="在这里开始输入..."
-          :editable="true"
-          :show-toolbar="true"
-          @update="handleUpdate"
-        />
+    <div class="editor-container">
+      <div class="editor-panel">
+        <div class="editor-wrapper">
+          <ProseEditor
+            v-model="content"
+            placeholder="输入 / 打开命令菜单..."
+            :editable="true"
+            :show-toolbar="true"
+            @update="handleUpdate"
+          />
+        </div>
       </div>
 
-      <div class="output-section">
-        <h3>输出预览</h3>
-        <div class="output-tabs">
-          <button
-            :class="{ active: outputTab === 'html' }"
-            @click="outputTab = 'html'"
-          >
-            HTML
-          </button>
-          <button
-            :class="{ active: outputTab === 'json' }"
-            @click="outputTab = 'json'"
-          >
-            JSON
-          </button>
-          <button
-            :class="{ active: outputTab === 'text' }"
-            @click="outputTab = 'text'"
-          >
-            纯文本
-          </button>
+      <div v-if="viewMode === 'preview'" class="divider"></div>
+
+      <div v-if="viewMode === 'preview'" class="markdown-panel">
+        <div class="markdown-wrapper">
+          <textarea
+            v-model="markdownContent"
+            class="markdown-editor"
+            placeholder="Markdown 内容..."
+            @input="handleMarkdownInput"
+          ></textarea>
         </div>
-        <pre class="output-content">{{ outputContent }}</pre>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { ProseEditor } from '@recall/prose'
-import '@recall/prose/style.css'
-
-const outputTab = ref<'html' | 'json' | 'text'>('html')
 
 const content = ref('')
+const markdownContent = ref('')
+const viewMode = ref<'wysiwyg' | 'preview'>('preview')
 const editorOutput = ref<{ html: string; json: object; text: string }>({
   html: '',
   json: {},
   text: ''
 })
 
-const handleUpdate = (value: { html: string; json: object; text: string }) => {
-  editorOutput.value = value
+// 简单的HTML到Markdown转换
+const htmlToMarkdown = (html: string): string => {
+  let md = html
+
+  // 标题
+  md = md.replace(/<h1>(.*?)<\/h1>/g, '# $1\n')
+  md = md.replace(/<h2>(.*?)<\/h2>/g, '## $1\n')
+  md = md.replace(/<h3>(.*?)<\/h3>/g, '### $1\n')
+  md = md.replace(/<h4>(.*?)<\/h4>/g, '#### $1\n')
+  md = md.replace(/<h5>(.*?)<\/h5>/g, '##### $1\n')
+  md = md.replace(/<h6>(.*?)<\/h6>/g, '###### $1\n')
+
+  // 粗体和斜体
+  md = md.replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+  md = md.replace(/<b>(.*?)<\/b>/g, '**$1**')
+  md = md.replace(/<em>(.*?)<\/em>/g, '*$1*')
+  md = md.replace(/<i>(.*?)<\/i>/g, '*$1*')
+  md = md.replace(/<u>(.*?)<\/u>/g, '<u>$1</u>')
+  md = md.replace(/<s>(.*?)<\/s>/g, '~~$1~~')
+
+  // 代码
+  md = md.replace(/<code>(.*?)<\/code>/g, '`$1`')
+  md = md.replace(/<pre><code>(.*?)<\/code><\/pre>/gs, '```\n$1\n```\n')
+
+  // 链接
+  md = md.replace(/<a href="(.*?)">(.*?)<\/a>/g, '[$2]($1)')
+
+  // 列表
+  md = md.replace(/<ul>(.*?)<\/ul>/gs, (match, content) => {
+    return content.replace(/<li>(.*?)<\/li>/g, '- $1\n')
+  })
+  md = md.replace(/<ol>(.*?)<\/ol>/gs, (match, content) => {
+    let index = 1
+    return content.replace(/<li>(.*?)<\/li>/g, () => `${index++}. $1\n`)
+  })
+
+  // 引用
+  md = md.replace(/<blockquote>(.*?)<\/blockquote>/gs, (match, content) => {
+    return content.split('\n').map((line: string) => `> ${line}`).join('\n') + '\n'
+  })
+
+  // 分割线
+  md = md.replace(/<hr\s*\/?>/g, '\n---\n')
+
+  // 段落
+  md = md.replace(/<p>(.*?)<\/p>/g, '$1\n\n')
+
+  // 清理HTML标签
+  md = md.replace(/<[^>]+>/g, '')
+
+  // 清理多余空行
+  md = md.replace(/\n{3,}/g, '\n\n')
+
+  return md.trim()
 }
 
-const outputContent = computed(() => {
-  switch (outputTab.value) {
-    case 'html':
-      return editorOutput.value.html
-    case 'json':
-      return JSON.stringify(editorOutput.value.json, null, 2)
-    case 'text':
-      return editorOutput.value.text
-    default:
-      return ''
-  }
-})
+// 简单的Markdown到HTML转换
+const markdownToHtml = (md: string): string => {
+  let html = md
 
-onMounted(() => {
-  content.value = `
-    <h1>欢迎使用 Recall Prose 编辑器</h1>
-    <p>这是一个功能强大的散文编辑器，基于 <strong>Tiptap</strong> 构建，支持分栏和高亮块等自定义功能。</p>
+  // 标题
+  html = html.replace(/^######\s+(.*)$/gm, '<h6>$1</h6>')
+  html = html.replace(/^#####\s+(.*)$/gm, '<h5>$1</h5>')
+  html = html.replace(/^####\s+(.*)$/gm, '<h4>$1</h4>')
+  html = html.replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+  html = html.replace(/^##\s+(.*)$/gm, '<h2>$1</h2>')
+  html = html.replace(/^#\s+(.*)$/gm, '<h1>$1</h1>')
 
-    <div data-type="callout" data-callout-type="info" class="callout callout-info">
-      <p>💡 这是一个信息提示块，可以用来展示重要信息。</p>
-    </div>
+  // 粗体和斜体
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  html = html.replace(/~~(.+?)~~/g, '<s>$1</s>')
 
-    <h2>主要特性</h2>
-    <ul>
-      <li>丰富的文本格式支持</li>
-      <li>表格、图片、链接等多媒体内容</li>
-      <li>任务列表和代码块</li>
-      <li>分栏布局</li>
-      <li>多种类型的高亮块（信息、警告、成功、错误、笔记）</li>
-    </ul>
+  // 代码
+  html = html.replace(/```(.*?)\n(.*?)```/gs, '<pre><code>$2</code></pre>')
+  html = html.replace(/`(.+?)`/g, '<code>$1</code>')
 
-    <h3>试试这些功能：</h3>
-    <ul data-type="taskList">
-      <li data-type="taskItem" data-checked="true"><p>粗体、斜体、下划线</p></li>
-      <li data-type="taskItem" data-checked="true"><p>标题和列表</p></li>
-      <li data-type="taskItem" data-checked="false"><p>插入表格和分栏</p></li>
-      <li data-type="taskItem" data-checked="false"><p>添加高亮块</p></li>
-    </ul>
+  // 链接
+  html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>')
 
-    <div data-type="callout" data-callout-type="success" class="callout callout-success">
-      <p>✅ 使用工具栏可以快速应用各种格式和插入自定义元素！</p>
-    </div>
-  `
-})
+  // 列表
+  html = html.replace(/^\-\s+(.*)$/gm, '<li>$1</li>')
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+  html = html.replace(/^\d+\.\s+(.*)$/gm, '<li>$1</li>')
+
+  // 引用
+  html = html.replace(/^>\s+(.*)$/gm, '<blockquote>$1</blockquote>')
+
+  // 分割线
+  html = html.replace(/^---$/gm, '<hr>')
+
+  // 段落
+  html = html.replace(/^(?!<[huo]|<pre|<blockquote)(.+)$/gm, '<p>$1</p>')
+
+  return html
+}
+
+const handleUpdate = (value: { html: string; json: object; text: string }) => {
+  editorOutput.value = value
+  markdownContent.value = htmlToMarkdown(value.html)
+}
+
+let isUpdatingFromMarkdown = false
+
+const handleMarkdownInput = () => {
+  if (isUpdatingFromMarkdown) return
+
+  isUpdatingFromMarkdown = true
+  const html = markdownToHtml(markdownContent.value)
+  content.value = html
+
+  setTimeout(() => {
+    isUpdatingFromMarkdown = false
+  }, 100)
+}
+
+// 初始内容
+content.value = `
+  <h1>欢迎使用 Recall Prose 编辑器</h1>
+  <p>这是一个功能强大的散文编辑器，基于 <strong>Tiptap</strong> 构建。</p>
+
+  <h2>新功能</h2>
+  <ul>
+    <li><strong>斜线菜单</strong>：输入 <code>/</code> 打开命令菜单</li>
+    <li><strong>悬浮工具栏</strong>：选中文本后自动显示格式化工具</li>
+    <li><strong>拖拽支持</strong>：可以拖拽节点重新排序</li>
+    <li><strong>Markdown 联动</strong>：左右两栏实时同步</li>
+  </ul>
+
+  <h3>试试这些功能：</h3>
+  <ul data-type="taskList">
+    <li data-type="taskItem" data-checked="true"><p>输入 / 打开斜线菜单</p></li>
+    <li data-type="taskItem" data-checked="true"><p>选中文本查看悬浮工具栏</p></li>
+    <li data-type="taskItem" data-checked="false"><p>在右侧编辑 Markdown</p></li>
+    <li data-type="taskItem" data-checked="false"><p>拖拽段落重新排序</p></li>
+  </ul>
+
+  <div data-type="callout" data-callout-type="info" class="callout callout-info">
+    <p>💡 提示：所有编辑都会实时同步到右侧的 Markdown 编辑器！</p>
+  </div>
+`
 </script>
 
 <style scoped>
 .prose-playground {
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: #f8f9fa;
-  padding: 24px;
 }
 
 .header {
-  max-width: 1400px;
-  margin: 0 auto 24px;
+  padding: 16px 24px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.view-mode-select {
+  border: 1px solid #ced4da;
+  background: white;
+  color: #212529;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 600;
   color: #212529;
 }
@@ -139,7 +246,7 @@ onMounted(() => {
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: 1px solid #228be6;
   border-radius: 6px;
   transition: all 0.2s;
@@ -150,85 +257,51 @@ onMounted(() => {
   color: white;
 }
 
-.prose-demo {
-  max-width: 1400px;
-  margin: 0 auto;
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.prose-demo h2 {
-  margin: 0 0 8px;
-  font-size: 24px;
-  font-weight: 600;
-  color: #212529;
-}
-
-.description {
-  margin: 0 0 24px;
-  color: #6c757d;
-  font-size: 16px;
-}
-
-.editor-wrapper {
-  margin-bottom: 32px;
-}
-
-.output-section {
-  margin-top: 32px;
-  padding-top: 32px;
-  border-top: 2px solid #e9ecef;
-}
-
-.output-section h3 {
-  margin: 0 0 16px;
-  font-size: 20px;
-  font-weight: 600;
-  color: #212529;
-}
-
-.output-tabs {
+.editor-container {
+  flex: 1;
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 0;
+  overflow: visible;
+  min-height: 0;
 }
 
-.output-tabs button {
-  padding: 6px 12px;
-  border: 1px solid #dee2e6;
+.editor-panel,
+.markdown-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: #495057;
-  transition: all 0.2s;
+  min-width: 0;
 }
 
-.output-tabs button:hover {
-  background: #f8f9fa;
+.divider {
+  width: 1px;
+  background: #e0e0e0;
+  flex-shrink: 0;
 }
 
-.output-tabs button.active {
-  background: #228be6;
-  color: white;
-  border-color: #228be6;
+.editor-wrapper,
+.markdown-wrapper {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
 }
 
-.output-content {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  padding: 16px;
-  margin: 0;
-  overflow-x: auto;
+.markdown-editor {
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  border: none;
+  outline: none;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   color: #212529;
-  max-height: 400px;
-  overflow-y: auto;
+  resize: none;
+  background: #f8f9fa;
+}
+
+.markdown-editor::placeholder {
+  color: #adb5bd;
 }
 </style>

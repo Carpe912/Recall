@@ -38,7 +38,10 @@ export default defineConfig({
         '@tiptap/extension-table-header',
         '@tiptap/extension-task-list',
         '@tiptap/extension-task-item',
-        '@tiptap/extension-placeholder'
+        '@tiptap/extension-placeholder',
+        '@tiptap/extension-bubble-menu',
+        '@tiptap/suggestion',
+        'tippy.js'
       ],
       output: {
         globals: {

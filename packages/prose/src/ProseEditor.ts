@@ -1,5 +1,11 @@
 import { Editor, EditorOptions } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
+import Paragraph from '@tiptap/extension-paragraph'
+import Heading from '@tiptap/extension-heading'
+import Blockquote from '@tiptap/extension-blockquote'
+import BulletList from '@tiptap/extension-bullet-list'
+import OrderedList from '@tiptap/extension-ordered-list'
+import ListItem from '@tiptap/extension-list-item'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import Highlight from '@tiptap/extension-highlight'
@@ -14,8 +20,10 @@ import TableHeader from '@tiptap/extension-table-header'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
+import BubbleMenu from '@tiptap/extension-bubble-menu'
 import { Columns, Column } from './extensions/Columns'
 import { Callout } from './extensions/Callout'
+import { NotionDragHandle } from './extensions/NotionDragHandle'
 
 export interface ProseEditorOptions extends Partial<EditorOptions> {
   placeholder?: string
@@ -32,6 +40,14 @@ export class ProseEditor {
       ...editorOptions
     } = options
 
+    const DraggableParagraph = Paragraph.extend({ draggable: true })
+    const DraggableHeading = Heading.extend({ draggable: true })
+    const DraggableBlockquote = Blockquote.extend({ draggable: true })
+    const DraggableBulletList = BulletList.extend({ draggable: true })
+    const DraggableOrderedList = OrderedList.extend({ draggable: true })
+    const DraggableListItem = ListItem.extend({ draggable: true })
+    const DraggableTaskItem = TaskItem.extend({ draggable: true })
+
     this.editor = new Editor({
       editable,
       extensions: [
@@ -44,7 +60,19 @@ export class ProseEditor {
               class: 'code-block',
             },
           },
+          paragraph: false,
+          heading: false,
+          blockquote: false,
+          bulletList: false,
+          orderedList: false,
+          listItem: false,
         }),
+        DraggableParagraph,
+        DraggableHeading,
+        DraggableBlockquote,
+        DraggableBulletList,
+        DraggableOrderedList,
+        DraggableListItem,
         Underline,
         TextAlign.configure({
           types: ['heading', 'paragraph'],
@@ -72,15 +100,17 @@ export class ProseEditor {
         TableHeader,
         TableCell,
         TaskList,
-        TaskItem.configure({
+        DraggableTaskItem.configure({
           nested: true,
         }),
         Placeholder.configure({
           placeholder,
         }),
+        BubbleMenu,
         Columns,
         Column,
         Callout,
+        NotionDragHandle,
       ],
       ...editorOptions,
     })

@@ -55,7 +55,7 @@ defineExpose({
   flex-direction: column;
   border: 1px solid #dee2e6;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: white;
 }
 </style>
