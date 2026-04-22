@@ -12,4 +12,12 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        prose: resolve(__dirname, 'prose.html'),
+      },
+    },
+  },
 })

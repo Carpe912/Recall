@@ -170,11 +170,13 @@ export class GraphiteEditor extends EventEmitter {
     // 拖拽事件
     this.dragManager.on('drag', () => {
       const draggedNodes = this.dragManager.getDraggedNodes()
-      const relatedEdges = this.edges.filter(e =>
+      // 更新与拖拽节点相关的边
+      this.edges.filter(e =>
         draggedNodes.some(n => n.id === e.fromNodeId || n.id === e.toNodeId)
       )
       this.updateEdges()
-      this.markDirtyForObjects(draggedNodes, relatedEdges)
+      // 拖拽时需要全量重绘，避免残影
+      this.renderer.markDirty()
     })
 
     this.dragManager.on('dragEnd', (nodes: Node[], dx: number, dy: number) => {
@@ -384,9 +386,9 @@ export class GraphiteEditor extends EventEmitter {
       const dy = worldPoint.y - this.resizeStartPoint.y
 
       this.handleResize(this.resizeNode, this.resizeHandle, dx, dy)
-      const relatedEdges = this.edges.filter(e => e.fromNodeId === this.resizeNode!.id || e.toNodeId === this.resizeNode!.id)
       this.updateEdges()
-      this.markDirtyForObjects([this.resizeNode], relatedEdges)
+      // 调整大小时需要全量重绘，避免残影
+      this.renderer.markDirty()
       return
     }
 

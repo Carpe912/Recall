@@ -1,11 +1,5 @@
 <template>
   <div class="playground">
-    <!-- 导航栏 -->
-    <div class="nav-bar">
-      <h2>Recall - 图形编辑器</h2>
-      <a href="/prose.html" class="nav-link">查看 Prose 编辑器 →</a>
-    </div>
-
     <div class="main-content">
       <canvas ref="canvasRef" class="canvas"></canvas>
 
@@ -613,10 +607,6 @@ function onShapeDragStart(e: DragEvent, shape: 'rectangle' | 'circle' | 'diamond
   draggedCustomNodeType = null
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'copy'
-    // 创建透明的拖拽图像以避免残影
-    const img = new Image()
-    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    e.dataTransfer.setDragImage(img, 0, 0)
   }
 }
 
@@ -626,10 +616,6 @@ function onCustomNodeDragStart(e: DragEvent, nodeType: string) {
   draggedShape = null
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'copy'
-    // 创建透明的拖拽图像以避免残影
-    const img = new Image()
-    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    e.dataTransfer.setDragImage(img, 0, 0)
   }
 }
 
@@ -810,40 +796,6 @@ function resetZoom() {
   height: 100%;
   display: flex;
   flex-direction: column;
-}
-
-.nav-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 24px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-  z-index: 100;
-}
-
-.nav-bar h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-}
-
-.nav-link {
-  color: #228be6;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border: 1px solid #228be6;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.nav-link:hover {
-  background: #228be6;
-  color: white;
 }
 
 .main-content {
