@@ -19,7 +19,7 @@ withDefaults(defineProps<Props>(), {
   modelValue: '',
   placeholder: '开始输入...',
   editable: true,
-  showToolbar: true,
+  showToolbar: false,
 })
 
 const emit = defineEmits<Emits>()

@@ -2,12 +2,6 @@
 import { EditorContent, useEditor, BubbleMenu as TiptapBubbleMenu, VueRenderer } from '@tiptap/vue-3'
 import { onBeforeUnmount, watch } from 'vue'
 import StarterKit from '@tiptap/starter-kit'
-import Paragraph from '@tiptap/extension-paragraph'
-import Heading from '@tiptap/extension-heading'
-import Blockquote from '@tiptap/extension-blockquote'
-import BulletList from '@tiptap/extension-bullet-list'
-import OrderedList from '@tiptap/extension-ordered-list'
-import ListItem from '@tiptap/extension-list-item'
 import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import Highlight from '@tiptap/extension-highlight'
@@ -22,11 +16,10 @@ import TableHeader from '@tiptap/extension-table-header'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
-import BubbleMenu from '@tiptap/extension-bubble-menu'
+import { NotionDragHandle } from '../extensions/NotionDragHandle'
 import { Columns, Column } from '../extensions/Columns'
 import { Callout } from '../extensions/Callout'
 import { SlashCommands, slashCommandItems } from '../extensions/SlashCommands'
-import { NotionDragHandle } from '../extensions/NotionDragHandle'
 import BubbleMenuComponent from './BubbleMenu.vue'
 import SlashMenu from './SlashMenu.vue'
 import tippy from 'tippy.js'
@@ -45,80 +38,37 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
-  placeholder: '开始输入...',
+  placeholder: "输入 '/' 插入内容...",
   editable: true,
 })
 
 const emit = defineEmits<Emits>()
-
-const DraggableParagraph = Paragraph.extend({ draggable: true })
-const DraggableHeading = Heading.extend({ draggable: true })
-const DraggableBlockquote = Blockquote.extend({ draggable: true })
-const DraggableBulletList = BulletList.extend({ draggable: true })
-const DraggableOrderedList = OrderedList.extend({ draggable: true })
-const DraggableListItem = ListItem.extend({ draggable: true })
-const DraggableTaskItem = TaskItem.extend({ draggable: true })
 
 const editor = useEditor({
   content: props.modelValue,
   editable: props.editable,
   extensions: [
     StarterKit.configure({
-      history: {
-        depth: 100,
-      },
-      codeBlock: {
-        HTMLAttributes: {
-          class: 'code-block',
-        },
-      },
-      paragraph: false,
-      heading: false,
-      blockquote: false,
-      bulletList: false,
-      orderedList: false,
-      listItem: false,
+      history: { depth: 100 },
+      codeBlock: { HTMLAttributes: { class: 'code-block' } },
     }),
-    DraggableParagraph,
-    DraggableHeading,
-    DraggableBlockquote,
-    DraggableBulletList,
-    DraggableOrderedList,
-    DraggableListItem,
     Underline,
     TextAlign.configure({
       types: ['heading', 'paragraph'],
       alignments: ['left', 'center', 'right', 'justify'],
     }),
-    Highlight.configure({
-      multicolor: true,
-    }),
+    Highlight.configure({ multicolor: true }),
     TextStyle,
     Color,
-    Link.configure({
-      openOnClick: false,
-      HTMLAttributes: {
-        class: 'link',
-      },
-    }),
-    Image.configure({
-      inline: true,
-      allowBase64: true,
-    }),
-    Table.configure({
-      resizable: true,
-    }),
+    Link.configure({ openOnClick: false }),
+    Image.configure({ inline: true, allowBase64: true }),
+    Table.configure({ resizable: true }),
     TableRow,
     TableHeader,
     TableCell,
     TaskList,
-    DraggableTaskItem.configure({
-      nested: true,
-    }),
-    Placeholder.configure({
-      placeholder: props.placeholder,
-    }),
-    BubbleMenu,
+    TaskItem.configure({ nested: true }),
+    Placeholder.configure({ placeholder: props.placeholder }),
     Columns,
     Column,
     Callout,
@@ -130,27 +80,20 @@ const editor = useEditor({
         command: ({ editor, range, props }: any) => {
           props.command({ editor, range })
         },
-        items: ({ query }: { query: string }) => {
-          return slashCommandItems.filter(item =>
-            item.title.toLowerCase().includes(query.toLowerCase()) ||
-            item.description.toLowerCase().includes(query.toLowerCase())
-          )
-        },
+        items: ({ query }: { query: string }) =>
+          slashCommandItems.filter(
+            item =>
+              item.title.toLowerCase().includes(query.toLowerCase()) ||
+              item.description.toLowerCase().includes(query.toLowerCase()),
+          ),
         render: () => {
           let component: VueRenderer
           let popup: TippyInstance[]
 
           return {
             onStart: (props: any) => {
-              component = new VueRenderer(SlashMenu, {
-                props,
-                editor: props.editor,
-              })
-
-              if (!props.clientRect) {
-                return
-              }
-
+              component = new VueRenderer(SlashMenu, { props, editor: props.editor })
+              if (!props.clientRect) return
               popup = tippy('body', {
                 getReferenceClientRect: props.clientRect,
                 appendTo: () => document.body,
@@ -159,30 +102,20 @@ const editor = useEditor({
                 interactive: true,
                 trigger: 'manual',
                 placement: 'bottom-start',
+                theme: 'prose-slash',
+                arrow: false,
+                offset: [0, 6],
               })
             },
-
             onUpdate(props: any) {
               component.updateProps(props)
-
-              if (!props.clientRect) {
-                return
-              }
-
-              popup[0].setProps({
-                getReferenceClientRect: props.clientRect,
-              })
+              if (!props.clientRect) return
+              popup[0].setProps({ getReferenceClientRect: props.clientRect })
             },
-
             onKeyDown(props: any) {
-              if (props.event.key === 'Escape') {
-                popup[0].hide()
-                return true
-              }
-
+              if (props.event.key === 'Escape') { popup[0].hide(); return true }
               return (component.ref as any)?.onKeyDown(props.event)
             },
-
             onExit() {
               popup[0].destroy()
               component.destroy()
@@ -195,11 +128,7 @@ const editor = useEditor({
   onUpdate: ({ editor }) => {
     const html = editor.getHTML()
     emit('update:modelValue', html)
-    emit('update', {
-      html,
-      json: editor.getJSON(),
-      text: editor.getText(),
-    })
+    emit('update', { html, json: editor.getJSON(), text: editor.getText() })
   },
 })
 
@@ -210,18 +139,23 @@ watch(() => props.modelValue, (value) => {
 })
 
 watch(() => props.editable, (value) => {
-  if (editor.value) {
-    editor.value.setEditable(value)
-  }
+  editor.value?.setEditable(value)
 })
 
 onBeforeUnmount(() => {
   editor.value?.destroy()
 })
 
-defineExpose({
-  editor,
-})
+defineExpose({ editor })
+
+// Only show bubble menu for text selections, not node selections (e.g. drag handle click)
+const shouldShowBubble = ({ editor }: any) => {
+  const { selection } = editor.state
+  if (selection.empty) return false
+  if (editor.isActive('codeBlock')) return false
+  // NodeSelection has a `.node` property; TextSelection does not
+  return !selection.node
+}
 </script>
 
 <template>
@@ -230,10 +164,8 @@ defineExpose({
     <TiptapBubbleMenu
       v-if="editor"
       :editor="editor"
-      :tippy-options="{ duration: 100 }"
-      :should-show="({ editor, from, to }) => {
-        return from !== to && !editor.isActive('codeBlock')
-      }"
+      :tippy-options="{ duration: 100, placement: 'top', theme: 'prose-bubble', arrow: false, offset: [0, 8] }"
+      :should-show="shouldShowBubble"
     >
       <BubbleMenuComponent :editor="editor" />
     </TiptapBubbleMenu>
@@ -244,12 +176,14 @@ defineExpose({
 .prose-editor {
   width: 100%;
   height: 100%;
+  position: relative;
 }
 
 .prose-editor :deep(.ProseMirror) {
   outline: none;
-  min-height: 200px;
-  padding: 16px 16px 16px 44px;
+  min-height: 300px;
+  /* left padding makes room for the drag handle */
+  padding: 4px 48px 4px 48px;
 }
 
 .prose-editor :deep(.ProseMirror p.is-editor-empty:first-child::before) {

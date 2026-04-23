@@ -21,9 +21,9 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import BubbleMenu from '@tiptap/extension-bubble-menu'
+import DragHandle from '@tiptap/extension-drag-handle'
 import { Columns, Column } from './extensions/Columns'
 import { Callout } from './extensions/Callout'
-import { NotionDragHandle } from './extensions/NotionDragHandle'
 
 export interface ProseEditorOptions extends Partial<EditorOptions> {
   placeholder?: string
@@ -110,7 +110,18 @@ export class ProseEditor {
         Columns,
         Column,
         Callout,
-        NotionDragHandle,
+        DragHandle.configure({
+          render: () => {
+            const element = document.createElement('div')
+            element.classList.add('pm-drag-handle-btn')
+            return element
+          },
+          computePositionConfig: {
+            placement: 'left-start',
+            strategy: 'fixed',
+          },
+          nested: true,
+        }),
       ],
       ...editorOptions,
     })
