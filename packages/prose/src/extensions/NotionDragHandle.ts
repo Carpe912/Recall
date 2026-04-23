@@ -82,6 +82,25 @@ function makeDragIcon(): SVGSVGElement {
 
 // ─── Block context menu ──────────────────────────────────────────────────────
 
+function getNodeIcon(view: any, pos: number): string {
+  const node = view.state.doc.nodeAt(pos)
+  if (!node) return '¶'
+  switch (node.type.name) {
+    case 'heading':        return `H${node.attrs.level}`
+    case 'bulletList':     return '•'
+    case 'orderedList':    return '1.'
+    case 'taskList':       return '✓'
+    case 'blockquote':     return '"'
+    case 'codeBlock':      return '</>'
+    case 'horizontalRule': return '—'
+    case 'table':          return '⊞'
+    case 'image':          return '⌼'
+    case 'callout':        return 'ℹ'
+    case 'columns':        return '⫿'
+    default:               return '¶'
+  }
+}
+
 function buildBlockMenu(
   editor: Editor,
   view: any,
@@ -98,7 +117,7 @@ function buildBlockMenu(
     'padding:4px',
     'min-width:192px',
     'z-index:200',
-    'font-family:ui-sans-serif,system-ui,sans-serif',
+    'font-family:\'DM Sans\',sans-serif',
     'font-size:13.5px',
     'color:#374151',
     'user-select:none',
@@ -187,7 +206,7 @@ function buildBlockMenu(
       'min-width:160px',
       'z-index:201',
       'display:none',
-      'font-family:ui-sans-serif,system-ui,sans-serif',
+      'font-family:\'DM Sans\',sans-serif',
       'font-size:13.5px',
       'color:#374151',
       'user-select:none',
@@ -445,8 +464,14 @@ export const NotionDragHandle = Extension.create({
           const wrapper = document.createElement('div')
           wrapper.className = 'pm-drag-handle-wrapper'
           wrapper.style.cssText =
-            'position:fixed;display:none;align-items:flex-start;z-index:100;pointer-events:none;'
+            'position:fixed;display:none;align-items:flex-start;gap:0px;z-index:100;pointer-events:none;'
 
+          // Left: node type icon
+          const nodeIconEl = document.createElement('span')
+          nodeIconEl.className = 'pm-drag-handle-node-icon'
+          nodeIconEl.textContent = '¶'
+
+          // Right: drag dots button
           const btn = document.createElement('button')
           btn.type = 'button'
           btn.className = 'pm-drag-handle-btn'
@@ -454,6 +479,8 @@ export const NotionDragHandle = Extension.create({
           btn.style.pointerEvents = 'auto'
           btn.style.cursor = 'grab'
           btn.appendChild(makeDragIcon())
+
+          wrapper.appendChild(nodeIconEl)
           wrapper.appendChild(btn)
           document.body.appendChild(wrapper)
 
@@ -541,11 +568,11 @@ export const NotionDragHandle = Extension.create({
             clearTimeout(hideTimer)
             activePos = pos
             activeEl = el
+            nodeIconEl.textContent = getNodeIcon(view, pos)
             const rect = el.getBoundingClientRect()
             wrapper.style.display = 'flex'
             wrapper.style.top = `${rect.top}px`
-            wrapper.style.left = `${rect.left - 28}px`
-            wrapper.style.height = `${rect.height}px`
+            wrapper.style.left = `${rect.left - 40}px`
           }
 
           const scheduleHide = (delay = 200) => {

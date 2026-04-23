@@ -3,7 +3,7 @@
   outline: none;
   min-height: 300px;
   padding: 4px 48px 80px 48px;
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 16px;
   line-height: 1.65;
   color: #1a1a1a;
@@ -43,8 +43,26 @@
 }
 
 /* Show when the wrapper is visible (toggled via JS) */
-.pm-drag-handle-wrapper[style*="flex"] .pm-drag-handle-btn {
+.pm-drag-handle-wrapper[style*="flex"] .pm-drag-handle-btn,
+.pm-drag-handle-wrapper[style*="flex"] .pm-drag-handle-node-icon {
   opacity: 1;
+}
+
+.pm-drag-handle-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 24px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #b0b0b0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+  user-select: none;
+  pointer-events: none;
 }
 
 .pm-drag-handle-btn:hover {
@@ -74,16 +92,15 @@
   font-weight: 700;
   letter-spacing: -0.01em;
   color: #1a1a1a;
-  margin: 1.4em 0 0.3em;
   line-height: 1.25;
 }
 
-.ProseMirror h1 { font-size: 1.875em; }
-.ProseMirror h2 { font-size: 1.5em; }
-.ProseMirror h3 { font-size: 1.25em; }
-.ProseMirror h4 { font-size: 1.1em; }
-.ProseMirror h5 { font-size: 1em; }
-.ProseMirror h6 { font-size: 0.9em; color: #6b7280; }
+.ProseMirror h1 { font-size: 1.875em; margin: 1.2em 0 0.4em; }
+.ProseMirror h2 { font-size: 1.5em;   margin: 1.0em 0 0.3em; }
+.ProseMirror h3 { font-size: 1.25em;  margin: 0.8em 0 0.2em; }
+.ProseMirror h4 { font-size: 1.1em;   margin: 0.6em 0 0.2em; }
+.ProseMirror h5 { font-size: 1em;     margin: 0.5em 0 0.1em; }
+.ProseMirror h6 { font-size: 0.9em;   margin: 0.4em 0 0.1em; color: #6b7280; }
 
 /* ── Paragraph ────────────────────────────────────────────────────────────── */
 .ProseMirror p { margin: 0.35em 0; }
