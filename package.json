@@ -5,6 +5,8 @@
   "description": "AI-driven collaborative knowledge platform",
   "scripts": {
     "dev": "pnpm --filter playground dev",
+    "dev:web": "pnpm --filter @recall/web dev",
+    "dev:server": "pnpm --filter @recall/server dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
@@ -18,5 +20,16 @@
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "vue-demi",
+      "esbuild"
+    ]
   }
 }
+
