@@ -144,14 +144,14 @@ function buildBlockMenu(
     return item
   }
 
-  // ── Accordion group — click trigger to expand/collapse inline
-  const addAccordion = (iconHtml: string, label: string): HTMLElement => {
-    let open = false
+  // ── Flyout submenu — hover trigger to show panel to the right
+  const addSubmenu = (iconHtml: string, label: string): HTMLElement => {
+    let hideTimer: number = 0
 
     const trigger = document.createElement('div')
     trigger.style.cssText = [
       'display:flex', 'align-items:center', 'gap:8px',
-      'padding:5px 8px', 'border-radius:6px', 'cursor:pointer',
+      'padding:5px 8px', 'border-radius:6px', 'cursor:default',
       'color:#374151', 'transition:background 0.1s',
     ].join(';')
 
@@ -159,7 +159,7 @@ function buildBlockMenu(
     iconEl.style.cssText = [
       'width:22px', 'height:22px', 'display:flex', 'align-items:center', 'justify-content:center',
       'background:#f3f4f6', 'border-radius:5px', 'font-size:11px',
-      'font-weight:700', 'flex-shrink:0', 'color:#6b7280',
+      'font-weight:700', 'flex-shrink:0', 'color:#6b7280', 'letter-spacing:-0.02em',
     ].join(';')
     iconEl.innerHTML = iconHtml
 
@@ -168,31 +168,61 @@ function buildBlockMenu(
     labelEl.textContent = label
 
     const chevron = document.createElement('span')
-    chevron.style.cssText = 'color:#9ca3af;font-size:11px;flex-shrink:0;transition:transform 0.15s;display:inline-block;'
+    chevron.style.cssText = 'color:#9ca3af;font-size:11px;flex-shrink:0;'
     chevron.textContent = '›'
 
     trigger.appendChild(iconEl)
     trigger.appendChild(labelEl)
     trigger.appendChild(chevron)
 
-    const body = document.createElement('div')
-    body.style.cssText = 'display:none;padding:2px 0 2px 4px;'
+    // Panel is a fixed-position flyout, child of menu so it's removed when menu is removed
+    const panel = document.createElement('div')
+    panel.style.cssText = [
+      'position:fixed',
+      'background:#fff',
+      'border:1px solid #e5e7eb',
+      'border-radius:10px',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.10),0 2px 6px rgba(0,0,0,0.06)',
+      'padding:4px',
+      'min-width:160px',
+      'z-index:201',
+      'display:none',
+      'font-family:ui-sans-serif,system-ui,sans-serif',
+      'font-size:13.5px',
+      'color:#374151',
+      'user-select:none',
+    ].join(';')
 
-    trigger.addEventListener('mouseenter', () => { trigger.style.background = '#f3f4f6' })
-    trigger.addEventListener('mouseleave', () => { trigger.style.background = 'transparent' })
-    trigger.addEventListener('mousedown', (e) => {
-      e.preventDefault()
-      open = !open
-      body.style.display = open ? 'block' : 'none'
-      chevron.style.transform = open ? 'rotate(90deg)' : 'none'
-    })
+    const showPanel = () => {
+      clearTimeout(hideTimer)
+      const menuRect = menu.getBoundingClientRect()
+      const triggerRect = trigger.getBoundingClientRect()
+      panel.style.left = `${menuRect.right + 4}px`
+      panel.style.top = `${triggerRect.top}px`
+      panel.style.display = 'block'
+      // Clamp bottom overflow
+      const pr = panel.getBoundingClientRect()
+      if (pr.bottom > window.innerHeight - 8) {
+        panel.style.top = `${triggerRect.top - (pr.bottom - window.innerHeight + 8)}px`
+      }
+    }
+
+    const scheduleHide = () => {
+      clearTimeout(hideTimer)
+      hideTimer = window.setTimeout(() => { panel.style.display = 'none' }, 200)
+    }
+
+    trigger.addEventListener('mouseenter', () => { trigger.style.background = '#f3f4f6'; showPanel() })
+    trigger.addEventListener('mouseleave', () => { trigger.style.background = 'transparent'; scheduleHide() })
+    panel.addEventListener('mouseenter', () => clearTimeout(hideTimer))
+    panel.addEventListener('mouseleave', () => { trigger.style.background = 'transparent'; scheduleHide() })
 
     menu.appendChild(trigger)
-    menu.appendChild(body)
-    return body
+    menu.appendChild(panel)
+    return panel
   }
 
-  // ── Item inside accordion body
+  // ── Item inside submenu panel
   const addAccordionItem = (body: HTMLElement, iconHtml: string, label: string, onClick: () => void) => {
     const item = document.createElement('div')
     item.style.cssText = [
@@ -295,7 +325,7 @@ function buildBlockMenu(
   const SVG_AR      = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="9" y1="18" x2="21" y2="18"/></svg>'
 
   // ── 转换为
-  const convertBody = addAccordion(SVG_CONVERT, '转换为')
+  const convertBody = addSubmenu(SVG_CONVERT, '转换为')
   const convertItems = [
     { icon: '¶',   label: '正文',     cmd: () => editor.chain().focus().setTextSelection(pos + 1).setParagraph().run() },
     { icon: 'H1',  label: '标题 1',   cmd: () => editor.chain().focus().setTextSelection(pos + 1).setHeading({ level: 1 }).run() },
@@ -319,16 +349,16 @@ function buildBlockMenu(
   }
 
   // ── 对齐
-  const alignBody = addAccordion(SVG_ALIGN, '对齐')
+  const alignBody = addSubmenu(SVG_ALIGN, '对齐')
   addAccordionItem(alignBody, SVG_AL, '靠左', () => run(() => editor.chain().focus().setTextSelection(pos + 1).setTextAlign('left').run()))
   addAccordionItem(alignBody, SVG_AC, '居中', () => run(() => editor.chain().focus().setTextSelection(pos + 1).setTextAlign('center').run()))
   addAccordionItem(alignBody, SVG_AR, '靠右', () => run(() => editor.chain().focus().setTextSelection(pos + 1).setTextAlign('right').run()))
 
   // ── 文字颜色
   const currentTextColor = editor.getAttributes('textStyle').color ?? ''
-  const textColorBody = addAccordion(SVG_COLOR, '文字颜色')
+  const textColorBody = addSubmenu(SVG_COLOR, '文字颜色')
+  addAccordionItem(textColorBody, 'A', '默认颜色', () => run(() => editor.chain().focus().unsetColor().run()))
   addColorSwatches(textColorBody, [
-    { value: '',        label: '默认' },
     { value: '#1a1a1a', label: '黑色' },
     { value: '#6b7280', label: '灰色' },
     { value: '#ef4444', label: '红色' },
@@ -338,15 +368,14 @@ function buildBlockMenu(
     { value: '#3b82f6', label: '蓝色' },
     { value: '#8b5cf6', label: '紫色' },
   ], (color) => {
-    if (color === '') editor.chain().focus().unsetColor().run()
-    else editor.chain().focus().setColor(color).run()
+    editor.chain().focus().setColor(color).run()
   }, currentTextColor)
 
   // ── 高亮颜色
   const currentHighlight = editor.getAttributes('highlight').color ?? ''
-  const hlBody = addAccordion(SVG_HL, '高亮颜色')
+  const hlBody = addSubmenu(SVG_HL, '高亮颜色')
+  addAccordionItem(hlBody, '⊘', '清除高亮', () => run(() => editor.chain().focus().unsetHighlight().run()))
   addColorSwatches(hlBody, [
-    { value: '',        label: '无高亮' },
     { value: '#fde68a', label: '黄色' },
     { value: '#fed7aa', label: '橙色' },
     { value: '#fecaca', label: '红色' },
@@ -355,8 +384,7 @@ function buildBlockMenu(
     { value: '#e9d5ff', label: '紫色' },
     { value: '#f3f4f6', label: '灰色' },
   ], (color) => {
-    if (color === '') editor.chain().focus().unsetHighlight().run()
-    else editor.chain().focus().setHighlight({ color }).run()
+    editor.chain().focus().setHighlight({ color }).run()
   }, currentHighlight)
 
   addDivider()
